@@ -327,6 +327,7 @@ import { useGlobalStore } from "@/store/global";
 import { useSettingsStore } from "@/store/settings";
 import { useSubsStore } from "@/store/subs";
 import { useSystemStore } from "@/store/system";
+import { useConfigGeneratorStore } from "@/store/configGenerator";
 import { useBackend } from "@/hooks/useBackend";
 import { resolveArtifactIcon } from "@/utils/artifactIcon";
 import {
@@ -367,11 +368,13 @@ const subsStore = useSubsStore();
 const globalStore = useGlobalStore();
 const systemStore = useSystemStore();
 const settingsStore = useSettingsStore();
+const configGeneratorStore = useConfigGeneratorStore();
 const { showNotify } = useAppNotifyStore();
 const { env } = useBackend();
 const { bottomSafeArea } = storeToRefs(globalStore);
 const { navBarHeight } = storeToRefs(systemStore);
 const { appearanceSetting, githubProxy, githubProxyRegex } = storeToRefs(settingsStore);
+const { projects: configGeneratorProjects } = storeToRefs(configGeneratorStore);
 
 const padding = bottomSafeArea.value + "px";
 const routeConfigName = computed(() => route.params.id as string);
@@ -515,6 +518,18 @@ const sourceOptions = computed(() => {
     });
   }
 
+  const configProjectItems = configGeneratorProjects.value;
+  if (configProjectItems.length > 0) {
+    options.push({
+      value: "config-project",
+      text: "Config Generator",
+      children: configProjectItems.map(item => ({
+        value: item.name,
+        text: item.displayName || item.name,
+      })),
+    });
+  }
+
   return options;
 });
 
@@ -605,6 +620,9 @@ watch(
 );
 
 onMounted(async () => {
+  if (env.value?.feature?.configGenerator || env.value?.feature?.['config-generator']) {
+    await configGeneratorStore.fetchProjects();
+  }
   if (isEditMode.value && artifactsStore.artifacts.length === 0) {
     await artifactsStore.fetchArtifactsData();
   }

@@ -633,6 +633,13 @@
       </nut-cell-group>
       <nut-cell-group>
         <nut-cell
+          v-if="env?.feature?.configGenerator || env?.feature?.['config-generator']"
+          :title="$t('configGenerator.navigation')"
+          class="right-icon"
+          @click.stop="router.push('/extensions/config-generator')"
+          is-link
+        ></nut-cell>
+        <nut-cell
           :title="$t(`apiSettingPage.apiSettingTitle`)"
           class="right-icon"
           @click.stop="onClickAPISetting"

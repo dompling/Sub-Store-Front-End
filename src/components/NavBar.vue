@@ -54,6 +54,20 @@
               />
             </button>
             <button
+              v-if="showImportButton"
+              type="button"
+              @click.stop="importConfigGenerator"
+              class="navBar-left-icon navBar-left-icon--import"
+              :style="{ left: navLeftButtonLeft.import }"
+              :aria-label="t('configGenerator.import')"
+              :title="t('configGenerator.import')"
+            >
+              <font-awesome-icon
+                class="icon"
+                icon="fa-solid fa-file-import"
+              />
+            </button>
+            <button
               v-if="showSearchButton"
               type="button"
               @click.stop="openListSearch"
@@ -271,9 +285,10 @@ const showRefreshButton = computed(() => {
   return !isNeedBack.value && !appearanceSetting.value.showFloatingRefreshButton;
 });
 const showAddButton = computed(() => {
-  return ["/subs", "/sync", "/files"].includes(route.path)
+  return ["/subs", "/sync", "/files", "/extensions/config-generator"].includes(route.path)
     && !appearanceSetting.value.showFloatingAddButton;
 });
+const showImportButton = computed(() => route.path === "/extensions/config-generator");
 const showSearchButton = computed(() => {
   return Boolean(route.meta.supportsListSearch) && !isLogsOverlayOpen.value;
 });
@@ -290,6 +305,19 @@ const listSearchQuery = computed({
 });
 const navLeftButtonLeft = computed<Record<string, string>>(() => {
   if (isNeedBack.value) {
+    if (route.path === "/extensions/config-generator") {
+      const buttons: Record<string, string> = {};
+      let left = 42;
+      if (showAddButton.value) {
+        buttons.add = `${left}px`;
+        left += 30;
+      }
+      if (showImportButton.value) {
+        buttons.import = `${left}px`;
+      }
+      return buttons;
+    }
+
     if (route.path === "/shares") {
       if (!hasShares.value) {
         return {
@@ -390,8 +418,13 @@ const add = (route: any) => {
     "/subs": "addSub",
     "/files": "addFile",
     "/sync": "addSync",
+    "/extensions/config-generator": "addConfigGenerator",
   };
   methodStore.invokeMethod(addMethodMap[routePath], {});
+};
+
+const importConfigGenerator = () => {
+  methodStore.invokeMethod("importConfigGenerator", {});
 };
 
 const back = () => {
@@ -401,14 +434,15 @@ const back = () => {
   }
 
   if (isNeedBack.value) {
+    const backPath = route.meta.backPath || "/";
     try {
       if (router.options.history.state.back) {
         router.back();
       } else {
-        router.push("/");
+        router.replace(backPath);
       }
     } catch (error) {
-      router.push("/");
+      router.replace(backPath);
     }
   }
 };
@@ -634,6 +668,7 @@ const refresh = async () => {
 
         .navBar-left-icon--refresh,
         .navBar-left-icon--add,
+        .navBar-left-icon--import,
         .navBar-left-icon--search {
           left: 7px;
         }

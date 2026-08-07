@@ -55,6 +55,18 @@
               </span>
               <div class="input-wrapper">
                 <nut-input
+                  v-if="findEditItemById(element).nameEditable === false"
+                  :id="`action-input-${element.id}`"
+                  :model-value="resolveReadonlyName(element)"
+                  @click.stop
+                  class="custom-name-input"
+                  type="text"
+                  readonly
+                  :placeholder="findEditItemById(element).defaultName"
+                  @click="toggleInput(element)"
+                />
+                <nut-input
+                  v-else
                   :id="`action-input-${element.id}`"
                   @click.stop
                   v-model="findEditItemById(element).customName"
@@ -97,7 +109,10 @@
               </div> -->
             </div>
             <div class="right">
-              <div class="list-group-item-icons icon-button__input">
+              <div
+                v-if="findEditItemById(element).nameEditable !== false"
+                class="list-group-item-icons icon-button__input"
+              >
                 <template v-if="!findEditItemById(element).isEditing">
                   <font-awesome-icon icon="fa-solid fa-pen-to-square" @click.stop="toggleEditName(element)" />
                 </template>
@@ -283,19 +298,27 @@ const { appearanceSetting } = storeToRefs(settingsStore);
 const pasteboard = ref("");
 const showPasteboard = ref(false);
 const drag = ref(true);
-const isCollapsed = ref(localStorage.getItem('actions-block-collapsed') === '1');
-const collapsedElements = ref([]);
+const storedCollapsePreference = localStorage.getItem('actions-block-collapsed') === '1';
+const isCollapsed = ref(storedCollapsePreference);
+const collapsedElements = ref<string[]>([]);
+const collapseStateInitialized = ref(false);
 const form = inject<any>('form');
 // 列表渲染的数据
 // 预览开关数组，数组第一项为 id，对应 list 中的同 id 项目，控制该 id 开启关闭预览
-const { checked, list, sourceType, actionTip, actionTipUrl, actionTipLinkText } = defineProps<{
+const props = withDefaults(defineProps<{
   checked: Array<[string, boolean]>;
   list: ActionModuleProps[];
   sourceType?: string;
   actionTip?: string;
   actionTipUrl?: string;
   actionTipLinkText?: string;
-}>();
+  initialCollapsedIds?: string[] | null;
+  persistCollapsePreference?: boolean;
+  readonlyNameResolver?: (element: ActionModuleProps) => string;
+}>(), {
+  persistCollapsePreference: true,
+});
+const { checked, list, sourceType, actionTip, actionTipUrl, actionTipLinkText } = props;
 
 
 const ADD_PROXIES_FROM_SUBSCRIPTION_OPERATOR = 'Add Proxies From Subscription Operator';
@@ -354,18 +377,45 @@ const columns = computed(() => {
     .map(type => allItems.value.find(item => item.value === type))
     .filter(Boolean);
 });
-if(isCollapsed.value) {
-  collapsedElements.value = list.map((item) => item.id);
-} else {
-  collapsedElements.value = [];
-}
+watch(
+  [
+    () => props.initialCollapsedIds,
+    () => list.map(item => item.id),
+  ],
+  ([initialCollapsedIds, listIds]) => {
+    if (!collapseStateInitialized.value) {
+      // Config Generator passes null while an existing project is loading.
+      // Do not fall back to the global preference during that window: doing
+      // so permanently locks the list in the wrong initial state before the
+      // project snapshot arrives.
+      if (initialCollapsedIds === null) return;
+      if (initialCollapsedIds !== undefined && initialCollapsedIds !== null) {
+        collapsedElements.value = [...new Set(initialCollapsedIds)];
+        isCollapsed.value = collapsedElements.value.length > 0;
+        collapseStateInitialized.value = true;
+        return;
+      }
+      if (!listIds.length) return;
+      collapsedElements.value = storedCollapsePreference ? [...listIds] : [];
+      isCollapsed.value = storedCollapsePreference;
+      collapseStateInitialized.value = true;
+      return;
+    }
+
+    const currentIds = new Set(listIds);
+    collapsedElements.value = collapsedElements.value.filter(id => currentIds.has(id));
+    isCollapsed.value = listIds.length > 0
+      && listIds.every(id => collapsedElements.value.includes(id));
+  },
+  { immediate: true },
+);
 const setCollapsed = (v) => {
   isCollapsed.value = v;
   if (v) {
-    localStorage.setItem('actions-block-collapsed', '1')
+    if (props.persistCollapsePreference) localStorage.setItem('actions-block-collapsed', '1');
     collapsedElements.value = list.map((item) => item.id);
   } else {
-    localStorage.removeItem('actions-block-collapsed')
+    if (props.persistCollapsePreference) localStorage.removeItem('actions-block-collapsed');
     collapsedElements.value = [];
   }
 };
@@ -555,26 +605,30 @@ const inCustomNameEditMode = computed(() =>
 );
 
 watch(() => list, (newV: ActionModuleProps[]) => {
-  if (editNameList.length > newV.length) {
-    // delete
-    const elementsToDelete = editNameList.filter(
-      (item) => !newV.some((newItem) => newItem.id === item.id),
-    );
-    elementsToDelete.forEach((element) => {
-      const index = editNameList.findIndex((item) => item.id === element.id);
-      if (index !== -1) {
-        editNameList.splice(index, 1);
-      }
-    });
-  } else {
-    // add
-    const elementsToAdd = newV.filter(
-      (newItem) => !editNameList.some((item) => item.id === newItem.id),
-    );
-    elementsToAdd.forEach((element) => {
-      editNameList.push(generateEditNameItem(element));
-    });
+  const nextIds = new Set(newV.map(item => item.id));
+  for (let index = editNameList.length - 1; index >= 0; index -= 1) {
+    if (!nextIds.has(editNameList[index].id)) editNameList.splice(index, 1);
   }
+
+  newV.forEach((element) => {
+    const existing = editNameList.find(item => item.id === element.id);
+    if (!existing) {
+      editNameList.push(generateEditNameItem(element));
+      return;
+    }
+
+    const next = generateEditNameItem(element);
+    const isEditing = existing.isEditing && next.nameEditable !== false;
+    const editingCustomName = existing.customName;
+    const editingOldCustomName = existing.oldCustomName;
+    Object.assign(existing, next, { isEditing });
+    if (isEditing) {
+      existing.customName = editingCustomName;
+      existing.oldCustomName = editingOldCustomName;
+    } else {
+      existing.oldCustomName = next.customName;
+    }
+  });
 }, { deep: true }); // https://cn.vuejs.org/guide/essentials/watchers
 
 watch(inCustomNameEditMode, (newV) => {
@@ -583,21 +637,28 @@ watch(inCustomNameEditMode, (newV) => {
 
 const findEditItemById = (target) =>
   editNameList.find((item) => item.id === target.id);
+const resolveReadonlyName = (element: ActionModuleProps) =>
+  props.readonlyNameResolver?.(element)
+  || findEditItemById(element)?.customName
+  || findEditItemById(element)?.defaultName
+  || '';
 
 const saveEditName = (element) => {
   const editItem = editNameList.find((item) => item.id === element.id);
+  if (!editItem || editItem.nameEditable === false) return;
   editItem.isEditing = false;
   if (/^\s*$/.test(editItem.customName)) {
     editItem.customName = "";
   }
   // stash
   editItem.oldCustomName = editItem.customName;
-  form.process.find((item) => item.id === element.id).customName =
-    editItem.customName;
+  const processItem = form?.process?.find((item) => item.id === element.id);
+  if (processItem) processItem.customName = editItem.customName;
 };
 
 const exitEditName = (element) => {
   const editItem = editNameList.find((item) => item.id === element.id);
+  if (!editItem) return;
   editItem.isEditing = false;
   if (editItem.oldCustomName !== editItem.customName) {
     editItem.customName = editItem.oldCustomName;
@@ -615,6 +676,7 @@ const exitAllEditName = () => {
 // 操作名称编辑
 const toggleEditName = (element) => {
   const editItem = editNameList.find((item) => item.id === element.id);
+  if (!editItem || editItem.nameEditable === false) return;
   editNameList.forEach((item) => {
     if (item.isEditing && item.id !== editItem.id) {
       // exit others

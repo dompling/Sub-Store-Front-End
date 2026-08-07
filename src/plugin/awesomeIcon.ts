@@ -11,12 +11,20 @@ import {
   faCheck,
   faClock,
   faCircleQuestion,
+  faCircleCheck,
   faCircleXmark,
   faXmark,
   faClone,
   faCloudArrowDown,
   faCloudArrowUp,
+  faIcons,
+  faLayerGroup,
+  faShuffle,
+  faPen,
+  faShieldHalved,
+  faWandMagicSparkles,
   faCode,
+  faCodeBranch,
   faDesktop,
   faEye,
   faEllipsis,
@@ -72,11 +80,13 @@ library.add(faClone);
 library.add(faEye);
 library.add(faGrip);
 library.add(faCircleQuestion);
+library.add(faCircleCheck);
 library.add(faFloppyDisk);
 library.add(faCircleXmark);
 library.add(faXmark);
 library.add(faLocationArrow);
 library.add(faCode);
+library.add(faCodeBranch);
 library.add(faFileLines);
 library.add(faDesktop);
 library.add(faArrowRotateRight);
@@ -86,6 +96,12 @@ library.add(faAnglesRight);
 library.add(faAngleRight);
 library.add(faCloudArrowDown);
 library.add(faCloudArrowUp);
+library.add(faIcons);
+library.add(faLayerGroup);
+library.add(faShuffle);
+library.add(faPen);
+library.add(faShieldHalved);
+library.add(faWandMagicSparkles);
 library.add(faBan);
 library.add(faPenToSquare);
 library.add(faPaste);

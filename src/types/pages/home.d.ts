@@ -6,4 +6,5 @@ type ActionModuleProps = {
   tipsDes: string;
   disabled?: boolean;
   enabled?: boolean;
+  nameEditable?: boolean;
 };

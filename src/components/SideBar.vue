@@ -51,9 +51,19 @@
           <span class="label" v-show="isExpanded">{{ $t('tabBar.archive') }}</span>
         </div>
 
+        <div
+          v-show="configGeneratorVisible"
+          class="menu-item"
+          :class="{ active: activeTab === 5 }"
+          @click="router.push('/extensions/config-generator')"
+        >
+          <font-awesome-icon icon="fa-solid fa-code-branch" style="font-size: 20px; width: 22px; height: 22px;" />
+          <span class="label" v-show="isExpanded">{{ $t('tabBar.configGenerator') }}</span>
+        </div>
+
         <div 
           class="menu-item" 
-          :class="{ active: activeTab === 5 }" 
+          :class="{ active: activeTab === 6 }"
           @click="router.push('/my')"
         >
           <div class="icon-container">
@@ -79,7 +89,7 @@ import { useWindowSize } from '@vueuse/core';
 
 const route = useRoute();
 const router = useRouter();
-const routeList = ['/subs', '/files', '/sync', '/shares', '/archives', '/my'];
+const routeList = ['/subs', '/files', '/sync', '/shares', '/archives', '/extensions/config-generator', '/my'];
 const activeTab = ref(routeList.indexOf(route.path));
 
 watch(
@@ -92,7 +102,8 @@ watch(
       else if (newPath.includes('/sync')) matchedIndex = 2;
       else if (newPath.includes('/shares')) matchedIndex = 3;
       else if (newPath.includes('/archives')) matchedIndex = 4;
-      else if (newPath.includes('/my')) matchedIndex = 5;
+      else if (newPath.includes('/extensions/config-generator')) matchedIndex = 5;
+      else if (newPath.includes('/my')) matchedIndex = 6;
     }
     if (matchedIndex !== -1) {
       activeTab.value = matchedIndex;
@@ -149,6 +160,9 @@ const shouldHideShareTab = computed(() => {
 });
 const shouldShowShareTab = computed(() => {
   return !!env.value?.feature?.share && !shouldHideShareTab.value;
+});
+const configGeneratorVisible = computed(() => {
+  return !!(env.value?.feature?.configGenerator || env.value?.feature?.['config-generator']);
 });
 
 </script>

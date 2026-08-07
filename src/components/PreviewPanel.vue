@@ -1,15 +1,15 @@
 <template>
   <div>
     <div class="desc" @click="tips">
-      <span>{{ desc }}</span>
+      <span>{{ props.desc }}</span>
       <nut-icon name="tips"></nut-icon>
     </div>
-    <div class="preview-options">
-      <div class="preview-option-item">
+    <div v-if="props.showSubscriptionOptions || props.showDisplayPreviewOption" class="preview-options">
+      <div v-if="props.showSubscriptionOptions" class="preview-option-item">
         <input type="checkbox" id="includeUnsupportedProxy" name="includeUnsupportedProxy" value="includeUnsupportedProxy" v-model="includeUnsupportedProxy">
-        <label for="includeUnsupportedProxy">{{ includeUnsupportedProxyLabel }}</label>
+        <label for="includeUnsupportedProxy">{{ props.includeUnsupportedProxyLabel }}</label>
       </div>
-      <div class="preview-option-item">
+      <div v-if="props.showSubscriptionOptions" class="preview-option-item">
         <input
           type="checkbox"
           id="prettyYaml"
@@ -17,9 +17,9 @@
           value="prettyYaml"
           v-model="prettyYaml"
         >
-        <label for="prettyYaml">{{ prettyYamlLabel }}</label>
+        <label for="prettyYaml">{{ props.prettyYamlLabel }}</label>
       </div>
-      <div class="preview-option-item">
+      <div v-if="props.showSubscriptionOptions" class="preview-option-item">
         <label>
           <input
             type="checkbox"
@@ -27,10 +27,10 @@
             value="noFlow"
             v-model="noFlow"
           >
-          {{ noFlowLabel }}
+          {{ props.noFlowLabel }}
         </label>
       </div>
-      <div class="preview-option-item">
+      <div v-if="props.showDisplayPreviewOption" class="preview-option-item">
         <input
           type="checkbox"
           id="displayPreviewInWebPage"
@@ -38,7 +38,7 @@
           :checked="appearanceSetting.displayPreviewInWebPage"
           @change="setDisplayPreviewInWebPage"
         >
-        <label for="displayPreviewInWebPage">{{ displayPreviewInWebPageLabel }}</label>
+        <label for="displayPreviewInWebPage">{{ props.displayPreviewInWebPageLabel }}</label>
       </div>
     </div>
     <ul class="preview-list">
@@ -77,7 +77,7 @@
 </template>
 
 <script lang="ts" setup>
-  import { onMounted, ref, watch } from 'vue';
+  import { computed, onMounted, ref, watch } from 'vue';
   import { Toast } from '@nutui/nutui';
   import json from '@/assets/icons/json.svg';
   import uri from '@/assets/icons/uri.svg';
@@ -112,26 +112,16 @@
   const { copy, isSupported } = useClipboard();
   const { toClipboard: copyFallback } = useV3Clipboard();
   const { showNotify } = useAppNotifyStore();
-  const {
-    name,
-    displayName,
-    type,
-    url,
-    general,
-    notify,
-    tipsTitle,
-    tipsContent,
-    desc,
-    tipsCancelText,
-    tipsOkText,
-    includeUnsupportedProxyLabel,
-    prettyYamlLabel,
-    noFlowLabel,
-    displayPreviewInWebPageLabel,
-  } = defineProps<{
+  type PreviewPlatform = {
+    name: string;
+    path: string | null;
+    icon: string;
+  };
+
+  const props = withDefaults(defineProps<{
     name: string;
     displayName?: string;
-    type: 'sub' | 'collection';
+    type: 'sub' | 'collection' | 'config-project';
     general: string;
     notify: string;
     desc: string;
@@ -139,12 +129,18 @@
     prettyYamlLabel: string;
     noFlowLabel: string;
     displayPreviewInWebPageLabel: string;
-    url?: string;
     tipsTitle?: string;
     tipsContent?: string;
     tipsCancelText?: string;
     tipsOkText?: string;
-  }>();
+    url?: string;
+    platforms?: PreviewPlatform[];
+    showSubscriptionOptions?: boolean;
+    showDisplayPreviewOption?: boolean;
+  }>(), {
+    showSubscriptionOptions: true,
+    showDisplayPreviewOption: true,
+  });
 
   const { currentUrl: host } = useHostAPI();
 
@@ -220,27 +216,27 @@
     return `${url}${hasQueryParams ? '&' : '?'}${queryString}`;
   };
 
-  const getUrl = (path: string, preview: boolean = false) => {
+  const getUrl = (path: string | null, preview: boolean = false) => {
     const query = {} as Record<string, string | boolean>;
     if (path !== null) {
       query.target = path;
     }
-    if (includeUnsupportedProxy.value) {
+    if (props.showSubscriptionOptions && includeUnsupportedProxy.value) {
       query.includeUnsupportedProxy = true;
     }
-    if (prettyYaml.value) {
+    if (props.showSubscriptionOptions && prettyYaml.value) {
       query.prettyYaml = true;
     }
-    if (noFlow.value) {
+    if (props.showSubscriptionOptions && noFlow.value) {
       query.noFlow = true;
     }
     let previewUrl
-    if (url) {
-      previewUrl = buildUrlWithQuery(url, query);
+    if (props.url) {
+      previewUrl = buildUrlWithQuery(props.url, query);
     } else {
       previewUrl = `${host.value}/download/${
-        type === "sub" ? "" : "collection/"
-        }${encodeURIComponent(name)}${Object.keys(query).length > 0 ? `?${Object.entries(query).map(([key, value]) => `${key}=${encodeURIComponent(value)}`).join('&')}` : ''}`; 
+        props.type === "sub" ? "" : "collection/"
+        }${encodeURIComponent(props.name)}${Object.keys(query).length > 0 ? `?${Object.entries(query).map(([key, value]) => `${key}=${encodeURIComponent(value)}`).join('&')}` : ''}`;
     }
     if (!preview) {
       return previewUrl;
@@ -248,29 +244,29 @@
 
     const previewQuery = {
       url: previewUrl,
-      name: displayName || name,
+      name: props.displayName || props.name,
       api: host.value,
     } as Record<string, string | boolean>;
 
-    if (type === "sub" || type === "collection") {
-      previewQuery.sourceType = type;
-      previewQuery.sourceName = name;
+    if (props.type === "sub" || props.type === "collection") {
+      previewQuery.sourceType = props.type;
+      previewQuery.sourceName = props.name;
     }
 
     return buildUrlWithQuery('/preview', previewQuery);
   }
-  const targetCopy = async (path: string) => {
+  const targetCopy = async (path: string | null) => {
     const url = getUrl(path);
     if (isSupported) {
       await copy(url);
     } else {
       await copyFallback(url);
     }
-    showNotify({ title: notify });
+    showNotify({ title: props.notify });
   };
-  const platformList = [
+  const defaultPlatformList: PreviewPlatform[] = [
     {
-      name: general,
+      name: props.general,
       path: null,
       icon: logoIcon,
     },
@@ -346,6 +342,7 @@
       icon: json,
     },
   ];
+  const platformList = computed(() => props.platforms?.length ? props.platforms : defaultPlatformList);
   const tips = () => {
     window.open('https://github.com/sub-store-org/Sub-Store/wiki/%E9%93%BE%E6%8E%A5%E5%8F%82%E6%95%B0%E8%AF%B4%E6%98%8E');
     // Dialog({

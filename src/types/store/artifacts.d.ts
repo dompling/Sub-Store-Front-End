@@ -18,7 +18,7 @@ type ArtifactsPlatform =
   | 'URI'
   | 'JSON';
 
-type ArtifactType = 'collection' | 'subscription' | 'file';
+type ArtifactType = 'collection' | 'subscription' | 'file' | 'config-project';
 
 interface Artifact {
   name: string;

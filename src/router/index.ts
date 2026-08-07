@@ -80,6 +80,7 @@ declare module 'vue-router' {
     title: string;
     needTabBar: boolean;
     needNavBack: boolean;
+    backPath?: string;
     supportsListViewMode?: boolean;
     supportsListSearch?: boolean;
     hideSideBarInWideScreenNarrowMode?: boolean;
@@ -206,6 +207,51 @@ const router = createRouter({
             title: 'logs',
             needTabBar: false,
             needNavBack: true,
+            hideSideBarInWideScreenNarrowMode: true,
+          },
+        },
+        {
+          path: '/extensions/config-generator',
+          component: () => import('@/views/extensions/ConfigGeneratorList.vue'),
+          meta: {
+            title: 'configGenerator',
+            needTabBar: false,
+            needNavBack: true,
+            backPath: '/my',
+            supportsListViewMode: true,
+            hideSideBarInWideScreenNarrowMode: true,
+          },
+        },
+        {
+          path: '/extensions/config-generator/edit/:name',
+          component: () => import('@/views/extensions/ConfigGenerator.vue'),
+          meta: {
+            title: 'configGenerator',
+            needTabBar: false,
+            needNavBack: true,
+            backPath: '/extensions/config-generator',
+            hideSideBarInWideScreenNarrowMode: true,
+          },
+        },
+        {
+          path: '/extensions/config-generator/import',
+          component: () => import('@/views/extensions/ConfigGeneratorImport.vue'),
+          meta: {
+            title: 'configGenerator',
+            needTabBar: false,
+            needNavBack: true,
+            backPath: '/extensions/config-generator',
+            hideSideBarInWideScreenNarrowMode: true,
+          },
+        },
+        {
+          path: '/extensions/config-generator/preview/:name',
+          component: () => import('@/views/extensions/ConfigGeneratorPreview.vue'),
+          meta: {
+            title: 'preview',
+            needTabBar: false,
+            needNavBack: true,
+            backPath: '/extensions/config-generator',
             hideSideBarInWideScreenNarrowMode: true,
           },
         },
