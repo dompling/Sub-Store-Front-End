@@ -5,6 +5,8 @@ import { useArtifactsStore } from "@/store/artifacts";
 import { useGlobalStore } from "@/store/global";
 import { useSettingsStore } from "@/store/settings";
 import { useSubsStore } from "@/store/subs";
+import { useExtensionsStore } from "@/store/extensions";
+import { EXTENSION_IDS } from "@/extensions/registry";
 // import { Toast } from '@nutui/nutui';
 
 export const initStores = async (
@@ -17,6 +19,7 @@ export const initStores = async (
   const subsStore = useSubsStore();
   const artifactsStore = useArtifactsStore();
   const settingsStore = useSettingsStore();
+  const extensionsStore = useExtensionsStore();
 
   const { t } = i18n.global;
   let isSucceed = true;
@@ -69,7 +72,20 @@ export const initStores = async (
     // 只有在成功获取环境信息后才继续获取其他数据
     await subsStore.fetchSubsData();
     await new Promise((resolve) => setTimeout(resolve, 50));
-    await artifactsStore.fetchArtifactsData();
+
+    // 配置托管现在具有独立的安装/启停生命周期。先完成一次静默
+    // handshake；旧后端会进入 legacy-fallback，新后端只有在插件可运行
+    // 时才读取 Artifact，避免 disabled/missing 的结构化 409 被误判为
+    // 整个 Sub-Store 后端不可用。
+    await extensionsStore.refresh({ silent: true });
+    const configHosting = extensionsStore.availability(
+      EXTENSION_IDS.CONFIG_HOSTING
+    );
+    if (["enabled", "bundled"].includes(configHosting.status)) {
+      await artifactsStore.fetchArtifactsData();
+    } else {
+      artifactsStore.invalidateArtifactsCache(true);
+    }
     await settingsStore.fetchSettings();
     await settingsStore.syncLocalAppearanceSetting();
 

@@ -129,6 +129,7 @@ export default {
       shareEditor: '分享编辑',
       archive: '已归档',
       logs: '后端日志',
+      extensions: '扩展',
       configGenerator: '配置管理',
       themeSetting: '主题设置',
       moreSetting: '更多设置',

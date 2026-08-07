@@ -129,6 +129,7 @@ export default {
       shareEditor: "Share Editor",
       archive: "Archived",
       logs: "Backend Logs",
+      extensions: "Extensions",
       configGenerator: "Config Generator",
       themeSetting: "Theme Setting",
       moreSetting: "More Setting",

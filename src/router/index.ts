@@ -12,7 +12,7 @@ import i18n from '@/locales';
 
 import File from '@/views/File.vue';
 import Sub from '@/views/Sub.vue';
-import Sync from '@/views/Sync.vue';
+import ExtensionRouteOutlet from '@/components/ExtensionRouteOutlet.vue';
 
 // import editScript from '@/views/editCode/editScript.vue';
 // import themeSetting from '@/views/themeSetting.vue';
@@ -138,7 +138,10 @@ const router = createRouter({
         },
         {
           path: '/sync',
-          component: Sync,
+          // Host-owned route slot. The outlet preserves the existing Sync
+          // surface when config-hosting is available and renders a recovery
+          // shell while the extension is disabled/missing/incompatible.
+          component: ExtensionRouteOutlet,
           meta: {
             title: 'sync',
             needTabBar: true,
@@ -223,6 +226,17 @@ const router = createRouter({
           },
         },
         {
+          path: '/extensions',
+          component: () => import('@/views/extensions/ExtensionStore.vue'),
+          meta: {
+            title: 'extensions',
+            needTabBar: false,
+            needNavBack: true,
+            backPath: '/my',
+            hideSideBarInWideScreenNarrowMode: true,
+          },
+        },
+        {
           path: '/extensions/config-generator/edit/:name',
           component: () => import('@/views/extensions/ConfigGenerator.vue'),
           meta: {
@@ -293,7 +307,7 @@ const router = createRouter({
         },
         {
           path: '/edit/sync/:id',
-          component: () => import('@/views/SyncEditor.vue'),
+          component: ExtensionRouteOutlet,
           meta: {
             title: 'syncEditor',
             needTabBar: false,

@@ -1,5 +1,7 @@
 interface ArtifactsStoreState {
   artifacts: Artifact[];
+  loadedRuntimeKey: string;
+  loadedAt: number;
 }
 
 type ArtifactsPlatform =

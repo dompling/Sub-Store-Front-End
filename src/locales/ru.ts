@@ -127,6 +127,7 @@ export default {
       "shareEditor": "Редактор шеринга",
       "archive": "Архив",
       "logs": "Логи бэкенда",
+      "extensions": "Расширения",
       "configGenerator": "Генератор конфигураций",
       "themeSetting": "Настройки темы",
       "moreSetting": "Дополнительные настройки",

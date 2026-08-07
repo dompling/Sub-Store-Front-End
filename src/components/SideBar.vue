@@ -4,7 +4,7 @@
       <div class="menu-items">
         <div 
           class="menu-item" 
-          :class="{ active: activeTab === 0 }" 
+          :class="{ active: activeNavigationId === CORE_NAVIGATION_IDS.SUBSCRIPTIONS }"
           @click="router.push('/subs')"
         >
           <nut-icon name="link" size="22px" />
@@ -14,7 +14,7 @@
         <div 
           v-show="!shouldHideFilesTab"
           class="menu-item" 
-          :class="{ active: activeTab === 1 }" 
+          :class="{ active: activeNavigationId === CORE_NAVIGATION_IDS.FILES }"
           @click="router.push('/files')"
         >
           <nut-icon name="category" size="22px" />
@@ -24,7 +24,7 @@
         <div 
           v-show="!shouldHideSyncTab"
           class="menu-item" 
-          :class="{ active: activeTab === 2 }" 
+          :class="{ active: activeNavigationId === NAVIGATION_IDS.CONFIG_HOSTING }"
           @click="router.push('/sync')"
         >
           <nut-icon name="refresh2" size="22px" />
@@ -34,7 +34,7 @@
         <div 
           v-show="shouldShowShareTab"
           class="menu-item" 
-          :class="{ active: activeTab === 3 }" 
+          :class="{ active: activeNavigationId === CORE_NAVIGATION_IDS.SHARES }"
           @click="router.push('/shares')"
         >
           <font-awesome-icon icon="fa-solid fa-share-nodes" style="font-size: 20px; width: 22px; height: 22px;" />
@@ -44,7 +44,7 @@
         <div 
           v-show="env?.feature?.archive"
           class="menu-item" 
-          :class="{ active: activeTab === 4 }" 
+          :class="{ active: activeNavigationId === CORE_NAVIGATION_IDS.ARCHIVES }"
           @click="router.push('/archives')"
         >
           <font-awesome-icon icon="fa-solid fa-box-archive" style="font-size: 20px; width: 22px; height: 22px;" />
@@ -54,16 +54,25 @@
         <div
           v-show="configGeneratorVisible"
           class="menu-item"
-          :class="{ active: activeTab === 5 }"
+          :class="{ active: activeNavigationId === NAVIGATION_IDS.CONFIG_GENERATOR }"
           @click="router.push('/extensions/config-generator')"
         >
           <font-awesome-icon icon="fa-solid fa-code-branch" style="font-size: 20px; width: 22px; height: 22px;" />
           <span class="label" v-show="isExpanded">{{ $t('tabBar.configGenerator') }}</span>
         </div>
 
+        <div
+          class="menu-item"
+          :class="{ active: activeNavigationId === NAVIGATION_IDS.EXTENSIONS_STORE }"
+          @click="router.push('/extensions')"
+        >
+          <font-awesome-icon icon="fa-solid fa-puzzle-piece" style="font-size: 20px; width: 22px; height: 22px;" />
+          <span class="label" v-show="isExpanded">{{ $t('navBar.pagesTitle.extensions') }}</span>
+        </div>
+
         <div 
           class="menu-item" 
-          :class="{ active: activeTab === 6 }"
+          :class="{ active: activeNavigationId === CORE_NAVIGATION_IDS.SETTINGS }"
           @click="router.push('/my')"
         >
           <div class="icon-container">
@@ -83,34 +92,33 @@ import { useSettingsStore } from '@/store/settings';
 import { useSystemStore } from "@/store/system";
 import { SIDEBAR_EXPANDED_BREAKPOINT } from "@/store/system";
 import { storeToRefs } from 'pinia';
-import { ref, computed, watch } from 'vue';
+import { computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useWindowSize } from '@vueuse/core';
+import { useExtensionsStore } from '@/store/extensions';
+import { EXTENSION_IDS, NAVIGATION_IDS } from '@/extensions/registry';
 
 const route = useRoute();
 const router = useRouter();
-const routeList = ['/subs', '/files', '/sync', '/shares', '/archives', '/extensions/config-generator', '/my'];
-const activeTab = ref(routeList.indexOf(route.path));
+const CORE_NAVIGATION_IDS = {
+  SUBSCRIPTIONS: 'org.substore.core.subscriptions',
+  FILES: 'org.substore.core.files',
+  SHARES: 'org.substore.core.shares',
+  ARCHIVES: 'org.substore.core.archives',
+  SETTINGS: 'org.substore.core.settings',
+} as const;
 
-watch(
-  () => route.path,
-  (newPath) => {
-    let matchedIndex = routeList.indexOf(newPath);
-    if (matchedIndex === -1) {
-      if (newPath.includes('/files')) matchedIndex = 1;
-      else if (newPath.includes('/subs')) matchedIndex = 0;
-      else if (newPath.includes('/sync')) matchedIndex = 2;
-      else if (newPath.includes('/shares')) matchedIndex = 3;
-      else if (newPath.includes('/archives')) matchedIndex = 4;
-      else if (newPath.includes('/extensions/config-generator')) matchedIndex = 5;
-      else if (newPath.includes('/my')) matchedIndex = 6;
-    }
-    if (matchedIndex !== -1) {
-      activeTab.value = matchedIndex;
-    }
-  },
-  { immediate: true }
-);
+const activeNavigationId = computed(() => {
+  const path = route.path;
+  if (path.startsWith('/extensions/config-generator')) return NAVIGATION_IDS.CONFIG_GENERATOR;
+  if (path === '/extensions') return NAVIGATION_IDS.EXTENSIONS_STORE;
+  if (path.startsWith('/edit/sync/') || path === '/sync') return NAVIGATION_IDS.CONFIG_HOSTING;
+  if (path.startsWith('/files') || path.startsWith('/edit/files/')) return CORE_NAVIGATION_IDS.FILES;
+  if (path.startsWith('/subs') || path.startsWith('/edit/subs/') || path.startsWith('/edit/collections/')) return CORE_NAVIGATION_IDS.SUBSCRIPTIONS;
+  if (path.startsWith('/shares') || path.startsWith('/edit/shares/')) return CORE_NAVIGATION_IDS.SHARES;
+  if (path.startsWith('/archives')) return CORE_NAVIGATION_IDS.ARCHIVES;
+  return CORE_NAVIGATION_IDS.SETTINGS;
+});
 
 const { width: windowWidth } = useWindowSize();
 
@@ -121,6 +129,7 @@ const isExpanded = computed(() => {
 const globalStore = useGlobalStore();
 const settingsStore = useSettingsStore();
 const systemStore = useSystemStore();
+const extensionsStore = useExtensionsStore();
 
 const { appearanceSetting, hasFetchedSettings, hasCachedAppearanceNavigationSetting } = storeToRefs(settingsStore);
 const { env } = storeToRefs(globalStore);
@@ -162,7 +171,14 @@ const shouldShowShareTab = computed(() => {
   return !!env.value?.feature?.share && !shouldHideShareTab.value;
 });
 const configGeneratorVisible = computed(() => {
-  return !!(env.value?.feature?.configGenerator || env.value?.feature?.['config-generator']);
+  const availability = extensionsStore.availability(EXTENSION_IDS.CONFIG_GENERATOR);
+  return availability.status === 'enabled'
+    || !!(env.value?.feature?.configGenerator || env.value?.feature?.['config-generator']);
+});
+
+onMounted(() => {
+  extensionsStore.refresh({ silent: true });
+  extensionsStore.startRevisionSync();
 });
 
 </script>

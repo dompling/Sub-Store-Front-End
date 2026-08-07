@@ -436,8 +436,16 @@ const onclickAddArtifact = () => {
   router.push("/edit/sync/UNTITLED");
 };
 
-onMounted(() => {
+onMounted(async () => {
   methodStore.registerMethod("addSync", onclickAddArtifact);
+  // The Host no longer preloads Artifact data while config-hosting is missing
+  // or disabled. Once the extension is enabled, its surface owns the initial
+  // data load so a freshly installed plugin opens with the retained records.
+  try {
+    await artifactsStore.ensureFreshArtifactsData();
+  } catch (error) {
+    globalStore.setFetchResult(false);
+  }
 });
 
 // const sortArtifacts = (newCollections: any) => {

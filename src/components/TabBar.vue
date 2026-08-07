@@ -46,10 +46,28 @@
   import { storeToRefs } from 'pinia';
   import { computed, ref } from 'vue';
   import { onBeforeRouteUpdate, useRoute } from 'vue-router';
+  import { NAVIGATION_IDS } from '@/extensions/registry';
 
   const route = useRoute();
-  const routeList = ['/subs', '/files', '/sync', '/shares', '/my'];
-  const activeTab = ref(routeList.indexOf(route.path));
+  const TAB_NAVIGATION = [
+    { id: 'org.substore.core.subscriptions', path: '/subs' },
+    { id: 'org.substore.core.files', path: '/files' },
+    { id: NAVIGATION_IDS.CONFIG_HOSTING, path: '/sync' },
+    { id: 'org.substore.core.shares', path: '/shares' },
+    { id: 'org.substore.core.settings', path: '/my' },
+  ] as const;
+  const navigationIdForPath = (path: string) => {
+    if (path === '/sync' || path.startsWith('/edit/sync/')) return NAVIGATION_IDS.CONFIG_HOSTING;
+    return TAB_NAVIGATION.find(item => path === item.path || path.startsWith(`${item.path}/`))?.id
+      || 'org.substore.core.settings';
+  };
+  const activeNavigationId = ref(navigationIdForPath(route.path));
+  const activeTab = computed({
+    get: () => Math.max(0, TAB_NAVIGATION.findIndex(item => item.id === activeNavigationId.value)),
+    set: (index: number) => {
+      activeNavigationId.value = TAB_NAVIGATION[index]?.id || activeNavigationId.value;
+    },
+  });
   const { isWideScreenNarrowModeActive } = useWideScreenNarrowMode();
 
 
@@ -105,7 +123,7 @@
     paddingBottom: bottomSafeArea.value + 'px',
   };
   onBeforeRouteUpdate((to, from, next) => {
-    activeTab.value = routeList.indexOf(to.path);
+    activeNavigationId.value = navigationIdForPath(to.path);
     // const scrollTop = document.documentElement.scrollTop || document.body.scrollTop
     // globalStore.setSavedPositions(from.path, { left: 0, top: scrollTop })
     next();

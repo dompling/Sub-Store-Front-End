@@ -10,17 +10,23 @@ import {
   faBan,
   faCheck,
   faClock,
+  faClockRotateLeft,
   faCircleQuestion,
+  faCircleInfo,
   faCircleCheck,
   faCircleXmark,
   faXmark,
   faClone,
   faCloudArrowDown,
   faCloudArrowUp,
+  faHourglassHalf,
   faIcons,
   faLayerGroup,
   faShuffle,
   faPen,
+  faPause,
+  faPuzzlePiece,
+  faServer,
   faShieldHalved,
   faWandMagicSparkles,
   faCode,
@@ -58,7 +64,8 @@ import {
   faBars,
   faBoxArchive,
   faShare,
-  faMagnifyingGlass
+  faMagnifyingGlass,
+  faTriangleExclamation
 } from '@fortawesome/free-solid-svg-icons';
 
 library.add(faFileImport);
@@ -71,6 +78,7 @@ library.add(faListCheck);
 library.add(faTableColumns);
 library.add(faCheck);
 library.add(faClock);
+library.add(faClockRotateLeft);
 library.add(faPlus);
 library.add(faReply);
 library.add(faArrowUpRightFromSquare);
@@ -80,6 +88,7 @@ library.add(faClone);
 library.add(faEye);
 library.add(faGrip);
 library.add(faCircleQuestion);
+library.add(faCircleInfo);
 library.add(faCircleCheck);
 library.add(faFloppyDisk);
 library.add(faCircleXmark);
@@ -96,10 +105,14 @@ library.add(faAnglesRight);
 library.add(faAngleRight);
 library.add(faCloudArrowDown);
 library.add(faCloudArrowUp);
+library.add(faHourglassHalf);
 library.add(faIcons);
 library.add(faLayerGroup);
 library.add(faShuffle);
 library.add(faPen);
+library.add(faPause);
+library.add(faPuzzlePiece);
+library.add(faServer);
 library.add(faShieldHalved);
 library.add(faWandMagicSparkles);
 library.add(faBan);
@@ -119,3 +132,4 @@ library.add(faMobileScreenButton);
 library.add(faBoxArchive);
 library.add(faShare);
 library.add(faMagnifyingGlass);
+library.add(faTriangleExclamation);
