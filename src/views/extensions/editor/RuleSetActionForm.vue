@@ -97,6 +97,10 @@ import {
   CONFIG_GENERATOR_TARGET_DEFINITIONS,
   DEFAULT_CONFIG_GENERATOR_TARGET,
 } from '@/views/extensions/configGeneratorTargets';
+import {
+  getRemoteRuleBindingName,
+  setRemoteRuleBindingName,
+} from '@/views/extensions/editor/ruleBindingPresentation';
 
 const { id } = defineProps<{ id: string }>();
 const context = inject<any>('configGeneratorActionContext');
@@ -108,12 +112,10 @@ const remoteRule = computed(() => {
   return rule?.kind === 'remote' ? rule : undefined;
 });
 const ruleBindingName = computed({
-  get: () => remoteRule.value?.name || ruleSet.value?.name || '',
+  get: () => getRemoteRuleBindingName(remoteRule.value),
   set: (value: string) => {
     if (!remoteRule.value) return;
-    const text = value.trim();
-    if (text) remoteRule.value.name = text;
-    else delete remoteRule.value.name;
+    setRemoteRuleBindingName(remoteRule.value, value);
   },
 });
 const ruleSetUrl = computed({

@@ -404,6 +404,7 @@ import ConfigGeneratorActionBlock from '@/views/extensions/editor/ConfigGenerato
 import PolicyGroupActionForm from '@/views/extensions/editor/PolicyGroupActionForm.vue';
 import InlineRuleActionForm from '@/views/extensions/editor/InlineRuleActionForm.vue';
 import RuleSetActionForm from '@/views/extensions/editor/RuleSetActionForm.vue';
+import { getRemoteRuleActionTitle } from '@/views/extensions/editor/ruleBindingPresentation';
 import ConfigGeneratorIndependentEditor from '@/views/extensions/editor/ConfigGeneratorIndependentEditor.vue';
 import { POLICY_GROUP_TYPE_DEFINITIONS } from '@/views/extensions/editor/policyGroupCapabilities';
 import {
@@ -891,8 +892,7 @@ const ruleType = (rule: RuleBinding) => {
 };
 const ruleActionTitle = (rule: RuleBinding) => {
   if (rule.kind !== 'remote') return ruleType(rule);
-  const name = rule.name?.trim() || rule.ruleSet?.trim();
-  return name ? `RULE-SET · ${name}` : 'RULE-SET';
+  return getRemoteRuleActionTitle(rule);
 };
 const ruleValue = (rule: RuleBinding) => {
   if (rule.kind === 'comment') return rule.text;
