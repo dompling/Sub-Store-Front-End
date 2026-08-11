@@ -384,7 +384,7 @@ watch(
   ],
   ([initialCollapsedIds, listIds]) => {
     if (!collapseStateInitialized.value) {
-      // Config Generator passes null while an existing project is loading.
+    // External editors may pass null while existing data is loading.
       // Do not fall back to the global preference during that window: doing
       // so permanently locks the list in the wrong initial state before the
       // project snapshot arrives.

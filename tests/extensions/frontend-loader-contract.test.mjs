@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { access, readFile } from 'node:fs/promises';
 import { test } from 'node:test';
 
 const rootUrl = new URL('../../', import.meta.url);
@@ -64,25 +64,38 @@ test('loads executable extension surfaces only through the verified dynamic load
   assert.match(syncEditor, /getArtifactSources/);
 });
 
-test('publishes immutable Host globals and cleans Host state even when plugin disposal fails', async () => {
+test('installs immutable Host globals before plugin execution and cleans failed disposal state', async () => {
   const [catalog, frontendSdk] = await Promise.all([
     readSource('src/extensions/frontend-catalog.ts'),
     readSource('src/extensions/frontend-sdk-v1.ts'),
   ]);
 
   assert.match(frontendSdk, /export \* from 'vue';/);
+  assert.doesNotMatch(catalog, /import \* as frontendSdkV1/);
+  assert.match(catalog, /type FrontendSdkV1 = typeof import\(['"]@\/extensions\/frontend-sdk-v1['"]\)/);
 
   const sdkDefinition = catalog.slice(
     catalog.indexOf("const frontendSdkGlobal = '__SUBSTORE_EXTENSION_FRONTEND_SDK_V1__'"),
     catalog.indexOf('export const registerFrontendExtensionDefinition'),
   );
+  assert.match(sdkDefinition, /const installFrontendSdkGlobal = async/);
+  assert.match(sdkDefinition, /import\(['"]@\/extensions\/frontend-sdk-v1['"]\)/);
   assert.match(sdkDefinition, /Object\.getOwnPropertyDescriptor/);
-  assert.match(sdkDefinition, /if \(!sdkDescriptor\)\s*\{[\s\S]*Object\.defineProperty/);
+  assert.match(sdkDefinition, /Object\.defineProperty/);
   assert.match(sdkDefinition, /configurable:\s*false/);
   assert.match(sdkDefinition, /writable:\s*false/);
   assert.match(sdkDefinition, /sdkDescriptor\.configurable !== false/);
   assert.match(sdkDefinition, /sdkDescriptor\.writable !== false/);
   assert.match(sdkDefinition, /FrontendExtensionSdkGlobalInvalid/);
+
+  const ensureDefinition = catalog.slice(
+    catalog.indexOf('export const ensureFrontendExtensionDefinition'),
+    catalog.indexOf('export const registerFrontendExtensionRoutes'),
+  );
+  const installIndex = ensureDefinition.indexOf('await installFrontendSdkGlobal()');
+  const executeIndex = ensureDefinition.indexOf('await executeTrustedBundle');
+  assert.ok(installIndex >= 0, 'the verified loader must install the Host SDK');
+  assert.ok(executeIndex > installIndex, 'the Host SDK must be installed before an extension executes');
 
   const disposeDefinition = catalog.slice(
     catalog.indexOf('export const disposeFrontendExtension'),
@@ -97,11 +110,10 @@ test('publishes immutable Host globals and cleans Host state even when plugin di
   assert.match(disposeDefinition, /FrontendExtensionDisposeFailed/);
 });
 
-test('keeps the complete Vue runtime ABI required by signed extension bundles', async () => {
-  const [sdk, sdkContract, bundle] = await Promise.all([
+test('keeps the complete Vue runtime ABI without bundling third-party extension assets', async () => {
+  const [sdk, sdkContract] = await Promise.all([
     readSource('src/extensions/frontend-sdk-v1.ts'),
     readSource('src/extensions/frontend-sdk-v1.contract.d.ts'),
-    readSource('public/extensions/org.substore.config-generator/1.1.0/frontend/index.js'),
   ]);
 
   assert.match(sdk, /export \* from ['"]vue['"]/);
@@ -114,17 +126,25 @@ test('keeps the complete Vue runtime ABI required by signed extension bundles', 
     /AssertNoMissingExports<[\s\S]*MissingVueRuntimeExports/,
   );
 
-  for (const helper of [
-    'defineComponent',
-    'resolveComponent',
-    'openBlock',
-    'createElementBlock',
-    'createElementVNode',
-    'toDisplayString',
-    'unref',
-    'withDirectives',
-  ]) {
-    assert.match(bundle, new RegExp(`\\be\\.${helper}\\b`));
+  await Promise.all([
+    assert.rejects(
+      access(new URL('../../public/extensions/org.substore.config-generator/1.1.0/frontend/index.js', import.meta.url)),
+    ),
+    assert.rejects(
+      access(new URL('../../public/extensions/org.substore.config-generator/1.1.0/frontend/style.css', import.meta.url)),
+    ),
+  ]);
+});
+
+test('keeps config-generator business messages out of Host locales', async () => {
+  const locales = await Promise.all([
+    readSource('src/locales/zh.ts'),
+    readSource('src/locales/en.ts'),
+    readSource('src/locales/ru.ts'),
+  ]);
+
+  for (const source of locales) {
+    assert.doesNotMatch(source, /["']?configGenerator["']?\s*:/);
   }
 });
 

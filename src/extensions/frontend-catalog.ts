@@ -2,7 +2,6 @@ import type { Component } from 'vue';
 import type { Router } from 'vue-router';
 
 import { getHostAPIUrl } from '@/hooks/useHostAPI';
-import * as frontendSdkV1 from '@/extensions/frontend-sdk-v1';
 import type {
   ExtensionAvailability,
   ExtensionManifest,
@@ -26,8 +25,11 @@ type FrontendManifest = {
   assets?: Record<string, FrontendAsset>;
 };
 
+// Keep the SDK import type-only here. Its API/store exports transitively import
+// this catalog, so an eager namespace import can read uninitialized bindings.
+type FrontendSdkV1 = typeof import('@/extensions/frontend-sdk-v1');
 type FrontendRegistrationHost = typeof globalThis & {
-  __SUBSTORE_EXTENSION_FRONTEND_SDK_V1__?: typeof frontendSdkV1;
+  __SUBSTORE_EXTENSION_FRONTEND_SDK_V1__?: FrontendSdkV1;
   __SUBSTORE_REGISTER_FRONTEND_EXTENSION__?: (
     definition: FrontendExtensionDefinition,
   ) => void;
@@ -53,32 +55,57 @@ export const frontendExtensionRouteContributions: FrontendExtensionRouteContribu
 
 const registrationHost = globalThis as FrontendRegistrationHost;
 const frontendSdkGlobal = '__SUBSTORE_EXTENSION_FRONTEND_SDK_V1__';
-const sdkDescriptor = Object.getOwnPropertyDescriptor(
-  registrationHost,
-  frontendSdkGlobal,
-);
-if (!sdkDescriptor) {
-  Object.defineProperty(
+let frontendSdkInstallPromise: Promise<FrontendSdkV1> | null = null;
+
+const installedFrontendSdk = (): FrontendSdkV1 | null => {
+  const sdkDescriptor = Object.getOwnPropertyDescriptor(
     registrationHost,
     frontendSdkGlobal,
-    {
-      value: frontendSdkV1,
-      configurable: false,
-      enumerable: false,
-      writable: false,
-    },
   );
-} else if (
-  !('value' in sdkDescriptor)
-  || !sdkDescriptor.value
-  || typeof sdkDescriptor.value !== 'object'
-  || sdkDescriptor.configurable !== false
-  || sdkDescriptor.writable !== false
-) {
-  const error = new Error('Sub-Store frontend extension SDK global is not immutable');
-  error.name = 'FrontendExtensionSdkGlobalInvalid';
-  throw error;
-}
+  if (!sdkDescriptor) return null;
+  if (
+    !('value' in sdkDescriptor)
+    || !sdkDescriptor.value
+    || typeof sdkDescriptor.value !== 'object'
+    || sdkDescriptor.configurable !== false
+    || sdkDescriptor.writable !== false
+  ) {
+    const error = new Error('Sub-Store frontend extension SDK global is not immutable');
+    error.name = 'FrontendExtensionSdkGlobalInvalid';
+    throw error;
+  }
+  return sdkDescriptor.value as FrontendSdkV1;
+};
+
+const installFrontendSdkGlobal = async (): Promise<FrontendSdkV1> => {
+  const installed = installedFrontendSdk();
+  if (installed) return installed;
+  if (!frontendSdkInstallPromise) {
+    // Extension bundles execute after the Host graph has initialized, making
+    // this deferred module load safe even though the SDK exposes Host stores.
+    frontendSdkInstallPromise = import('@/extensions/frontend-sdk-v1')
+      .then((frontendSdkV1) => {
+        const installedDuringImport = installedFrontendSdk();
+        if (installedDuringImport) return installedDuringImport;
+        Object.defineProperty(
+          registrationHost,
+          frontendSdkGlobal,
+          {
+            value: frontendSdkV1,
+            configurable: false,
+            enumerable: false,
+            writable: false,
+          },
+        );
+        return frontendSdkV1;
+      })
+      .catch((error) => {
+        frontendSdkInstallPromise = null;
+        throw error;
+      });
+  }
+  return frontendSdkInstallPromise;
+};
 
 export const registerFrontendExtensionDefinition = (
   definition: FrontendExtensionDefinition,
@@ -329,6 +356,7 @@ export const ensureFrontendExtensionDefinition = async (
         ? fetchVerifiedText(styleAsset.url, styleAsset.digest)
         : Promise.resolve(''),
     ]);
+    await installFrontendSdkGlobal();
     if (styleSource) installStyle(availability.extensionId, styleSource);
     pendingRegistrations.add(availability.extensionId);
     try {
