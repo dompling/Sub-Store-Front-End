@@ -6,9 +6,10 @@ const rootUrl = new URL('../../', import.meta.url);
 const readSource = relativePath => readFile(new URL(relativePath, rootUrl), 'utf8');
 
 test('loads executable extension surfaces only through the verified dynamic loader', async () => {
-  const [router, catalog, registry, outlet, navBar, syncEditor] = await Promise.all([
+  const [router, catalog, contracts, registry, outlet, navBar, syncEditor] = await Promise.all([
     readSource('src/router/index.ts'),
     readSource('src/extensions/frontend-catalog.ts'),
+    readSource('src/extensions/contracts.ts'),
     readSource('src/extensions/registry.ts'),
     readSource('src/components/ExtensionRouteOutlet.vue'),
     readSource('src/components/NavBar.vue'),
@@ -34,10 +35,14 @@ test('loads executable extension surfaces only through the verified dynamic load
   assert.doesNotMatch(registry, /configGeneratorManifest/);
   assert.match(catalog, /const builtInDefinitions:[\s\S]*configHostingFrontendExtension/);
 
-  assert.match(catalog, /assertTrustedFrontend\(availability\)/);
-  assert.match(catalog, /manifest\?\.kind !== 'trusted-official'/);
-  assert.match(catalog, /manifest\.trust\?\.level !== 'official-root'/);
-  assert.match(catalog, /manifest\.trust\?\.allowlistedId !== true/);
+  assert.match(contracts, /ExtensionKind = [^;]*'executable'/);
+  assert.match(catalog, /assertVerifiedFrontend\(availability, runtime\)/);
+  assert.match(catalog, /manifest\?\.kind === 'trusted-official'/);
+  assert.match(catalog, /manifest\?\.kind === 'executable'/);
+  assert.match(catalog, /runtime === 'node'/);
+  assert.match(catalog, /availability\.receipt\?\.installationStatus === 'installed'/);
+  assert.match(catalog, /source-integrity/);
+  assert.match(catalog, /local-integrity/);
   assert.match(catalog, /crypto\.subtle\.digest\([\s\S]*'SHA-256'/);
   assert.match(catalog, /fetchVerifiedText\(entryAsset\.url, entryAsset\.digest\)/);
   assert.match(catalog, /fetchVerifiedText\(styleAsset\.url, styleAsset\.digest\)/);

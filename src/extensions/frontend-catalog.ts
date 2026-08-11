@@ -298,14 +298,30 @@ const executeTrustedBundle = async (extensionId: string, source: string) => {
   }
 };
 
-const assertTrustedFrontend = (availability: ExtensionAvailability) => {
+const verifiedExecutableCodeStatuses = new Set([
+  'verified-package-installed',
+  'verified-package-active',
+  'verified-package-inactive',
+]);
+
+const assertVerifiedFrontend = (
+  availability: ExtensionAvailability,
+  runtime?: ExtensionRuntimeName,
+) => {
   const manifest = availability.manifest;
-  if (
-    manifest?.kind !== 'trusted-official'
-    || manifest.trust?.level !== 'official-root'
-    || manifest.trust?.allowlistedId !== true
-  ) {
-    const error = new Error('Only allowlisted official extensions may use native Vue surfaces');
+  const officialPackage = manifest?.kind === 'trusted-official'
+    && manifest.trust?.level === 'official-root'
+    && manifest.trust?.allowlistedId === true;
+  const verificationMode = availability.receipt?.verificationMode;
+  const executablePackage = manifest?.kind === 'executable'
+    && runtime === 'node'
+    && availability.receipt?.installationStatus === 'installed'
+    && (verificationMode === 'source-integrity' || verificationMode === 'local-integrity')
+    && verifiedExecutableCodeStatuses.has(
+      String(availability.codeStatus || availability.receipt?.codeStatus || ''),
+    );
+  if (!officialPackage && !executablePackage) {
+    const error = new Error('Frontend extension is not backed by a verified executable package');
     error.name = 'FrontendExtensionTrustRejected';
     throw error;
   }
@@ -340,7 +356,7 @@ export const ensureFrontendExtensionDefinition = async (
   }
 
   const promise = (async () => {
-    assertTrustedFrontend(availability);
+    assertVerifiedFrontend(availability, runtime);
     const entrypoint = manifestAsset(availability.manifest, 'entrypoint');
     if (!entrypoint) {
       const error = new Error('Frontend extension entrypoint is missing');

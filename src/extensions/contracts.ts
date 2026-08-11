@@ -9,7 +9,7 @@ import type { ExtensionDirectoryProjection } from '@/extensions/localDirectory';
  * shape here: this is the wire format shared by the host and every surface.
  */
 
-export type ExtensionKind = 'bundled' | 'trusted-official' | 'content' | 'sandboxed';
+export type ExtensionKind = 'bundled' | 'trusted-official' | 'executable' | 'content' | 'sandboxed';
 
 export type ExtensionStatus =
   | 'bundled'
@@ -159,6 +159,7 @@ export interface ExtensionInstallReceipt {
   retainedReason?: 'user-uninstalled' | 'backup-restored';
   installedAt?: number;
   enabled?: boolean;
+  verificationMode?: 'trusted-signature' | 'source-integrity' | 'local-integrity' | string;
   fileDigests?: Record<string, string>;
   rollbackAvailable?: boolean;
   rollbackVersions?: string[];
