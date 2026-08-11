@@ -639,13 +639,6 @@
           is-link
         ></nut-cell>
         <nut-cell
-          v-if="configGeneratorVisible"
-          :title="$t('configGenerator.navigation')"
-          class="right-icon"
-          @click.stop="router.push('/extensions/config-generator')"
-          is-link
-        ></nut-cell>
-        <nut-cell
           :title="$t(`apiSettingPage.apiSettingTitle`)"
           class="right-icon"
           @click.stop="onClickAPISetting"
@@ -755,14 +748,11 @@ import AgeKeyHelper from "@/components/AgeKeyHelper.vue";
 import DesktopPicker from "@/components/DesktopPicker.vue";
 import { AGE_SECRET_KEY } from "@/utils/age";
 import { Dialog, Toast } from '@nutui/nutui';
-import { useExtensionsStore } from '@/store/extensions';
-import { EXTENSION_IDS } from '@/extensions/registry';
 
 const { t } = useI18n();
 
 // const route = useRoute();
 const router = useRouter();
-const extensionsStore = useExtensionsStore();
 const { showNotify } = useAppNotifyStore();
 const { currentUrl: host } = useHostAPI();
 const settingsStore = useSettingsStore();
@@ -854,11 +844,6 @@ const shareBtnVisible = computed(() => {
 const archiveVisible = computed(() => {
   return env.value?.feature?.archive;
 });
-const configGeneratorVisible = computed(() => {
-  return extensionsStore.availability(EXTENSION_IDS.CONFIG_GENERATOR).status === 'enabled'
-    || !!(env.value?.feature?.configGenerator || env.value?.feature?.['config-generator']);
-});
-
 const onClickAPISetting = () => {
   router.push(`/settings/api`);
 };

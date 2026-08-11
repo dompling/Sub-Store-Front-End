@@ -42,11 +42,28 @@
               />
             </button>
             <button
+              v-if="showManageButton"
+              type="button"
+              @click.stop="invokePageAction('manageCommand')"
+              class="navBar-left-icon navBar-left-icon--manage"
+              :class="{ 'is-active': extensionsStore.launcherManagementMode }"
+              :style="{ left: navLeftButtonLeft.manage }"
+              :aria-label="extensionManagementLabel"
+              :title="extensionManagementLabel"
+            >
+              <font-awesome-icon
+                class="icon"
+                :icon="extensionsStore.launcherManagementMode ? 'fa-solid fa-check' : 'fa-solid fa-pen'"
+              />
+            </button>
+            <button
               v-if="showAddButton"
               type="button"
-              @click.stop="add(route)"
+              @click.stop="invokePageAction('addCommand')"
               class="navBar-left-icon navBar-left-icon--add"
               :style="{ left: navLeftButtonLeft.add }"
+              :aria-label="pageActions.addLabelKey ? t(pageActions.addLabelKey) : undefined"
+              :title="pageActions.addLabelKey ? t(pageActions.addLabelKey) : undefined"
             >
               <font-awesome-icon
                 class="icon fa-plus"
@@ -56,11 +73,11 @@
             <button
               v-if="showImportButton"
               type="button"
-              @click.stop="importConfigGenerator"
+              @click.stop="invokePageAction('importCommand')"
               class="navBar-left-icon navBar-left-icon--import"
               :style="{ left: navLeftButtonLeft.import }"
-              :aria-label="t('configGenerator.import')"
-              :title="t('configGenerator.import')"
+              :aria-label="pageActions.importLabelKey ? t(pageActions.importLabelKey) : undefined"
+              :title="pageActions.importLabelKey ? t(pageActions.importLabelKey) : undefined"
             >
               <font-awesome-icon
                 class="icon"
@@ -93,8 +110,8 @@
               v-model="listSearchQuery"
               class="nav-search-input"
               type="search"
-              :placeholder="t('navBar.listSearch.placeholder')"
-              :aria-label="t('navBar.listSearch.placeholder')"
+              :placeholder="listSearchPlaceholder"
+              :aria-label="listSearchPlaceholder"
               @keydown.esc.stop.prevent="closeListSearch"
             />
             <button
@@ -209,6 +226,7 @@ import { initStores } from "@/utils/initApp";
 import { useMethodStore } from '@/store/methodStore';
 import { useAppNotifyStore } from "@/store/appNotify";
 import { useListSearchStore } from "@/store/listSearch";
+import { useExtensionsStore } from "@/store/extensions";
 import { LOGS_PATH } from "@/utils/popupHistory";
 import { resetPwaCacheAndReload } from "@/utils/pwa";
 import i18n from "@/locales";
@@ -226,6 +244,7 @@ const logsOverlayStore = useLogsOverlayStore();
 const settingsStore = useSettingsStore();
 const subsStore = useSubsStore();
 const listSearchStore = useListSearchStore();
+const extensionsStore = useExtensionsStore();
 const { changeAppearanceSetting } = settingsStore;
 const { appearanceSetting } = storeToRefs(settingsStore);
 const { hasEntries: hasArchiveEntries } = storeToRefs(archiveStore);
@@ -281,16 +300,35 @@ const currentTitleWhetherAsk = computed(() => {
   return ownAsk.includes(metaTitle) ? "ask" : "";
 });
 const showLogsButton = computed(() => route.path !== LOGS_PATH);
+const extensionLauncherManaging = computed(() => (
+  route.path === '/extensions' && extensionsStore.launcherManagementMode
+));
 const showRefreshButton = computed(() => {
-  return !isNeedBack.value && !appearanceSetting.value.showFloatingRefreshButton;
+  return !isNeedBack.value
+    && !appearanceSetting.value.showFloatingRefreshButton
+    && !extensionLauncherManaging.value;
 });
+const extensionPageAvailable = computed(() => {
+  const extensionId = String(route.meta.extensionId || '');
+  if (!extensionId) return true;
+  return ['enabled', 'bundled'].includes(
+    extensionsStore.availability(extensionId).status,
+  );
+});
+const pageActions = computed(() => (
+  extensionPageAvailable.value ? route.meta.pageActions || {} : {}
+));
 const showAddButton = computed(() => {
-  return ["/subs", "/sync", "/files", "/extensions/config-generator"].includes(route.path)
-    && !appearanceSetting.value.showFloatingAddButton;
+  return Boolean(pageActions.value.addCommand)
+    && !appearanceSetting.value.showFloatingAddButton
+    && !extensionLauncherManaging.value;
 });
-const showImportButton = computed(() => route.path === "/extensions/config-generator");
+const showImportButton = computed(() => Boolean(pageActions.value.importCommand));
+const showManageButton = computed(() => Boolean(pageActions.value.manageCommand));
 const showSearchButton = computed(() => {
-  return Boolean(route.meta.supportsListSearch) && !isLogsOverlayOpen.value;
+  return Boolean(route.meta.supportsListSearch)
+    && !isLogsOverlayOpen.value
+    && !extensionLauncherManaging.value;
 });
 const isListSearchActive = computed(() => {
   return showSearchButton.value
@@ -303,21 +341,14 @@ const listSearchQuery = computed({
     listSearchStore.setQuery(value);
   },
 });
+const listSearchPlaceholder = computed(() => route.meta.listSearchPlaceholderKey
+  ? t(route.meta.listSearchPlaceholderKey)
+  : t('navBar.listSearch.placeholder'));
+const extensionManagementLabel = computed(() => extensionsStore.launcherManagementMode
+  ? t('navBar.extensionStore.done')
+  : t('navBar.extensionStore.manage'));
 const navLeftButtonLeft = computed<Record<string, string>>(() => {
   if (isNeedBack.value) {
-    if (route.path === "/extensions/config-generator") {
-      const buttons: Record<string, string> = {};
-      let left = 42;
-      if (showAddButton.value) {
-        buttons.add = `${left}px`;
-        left += 30;
-      }
-      if (showImportButton.value) {
-        buttons.import = `${left}px`;
-      }
-      return buttons;
-    }
-
     if (route.path === "/shares") {
       if (!hasShares.value) {
         return {
@@ -342,9 +373,24 @@ const navLeftButtonLeft = computed<Record<string, string>>(() => {
       };
     }
 
-    return {
-      search: "42px",
-    };
+    const buttons: string[] = [];
+    if (showAddButton.value) {
+      buttons.push("add");
+    }
+    if (showManageButton.value) {
+      buttons.push("manage");
+    }
+    if (showImportButton.value) {
+      buttons.push("import");
+    }
+    if (showSearchButton.value) {
+      buttons.push("search");
+    }
+
+    return buttons.reduce((acc, key, index) => {
+      acc[key] = `${42 + index * 30}px`;
+      return acc;
+    }, {} as Record<string, string>);
   }
 
   const buttons: string[] = [];
@@ -353,6 +399,9 @@ const navLeftButtonLeft = computed<Record<string, string>>(() => {
   }
   if (showAddButton.value) {
     buttons.push("add");
+  }
+  if (showManageButton.value) {
+    buttons.push("manage");
   }
   if (showSearchButton.value) {
     buttons.push("search");
@@ -412,19 +461,9 @@ const onClickNavbarIcon = () => {
     });
 };
 
-const add = (route: any) => {
-  const routePath = route.path;
-  const addMethodMap = {
-    "/subs": "addSub",
-    "/files": "addFile",
-    "/sync": "addSync",
-    "/extensions/config-generator": "addConfigGenerator",
-  };
-  methodStore.invokeMethod(addMethodMap[routePath], {});
-};
-
-const importConfigGenerator = () => {
-  methodStore.invokeMethod("importConfigGenerator", {});
+const invokePageAction = (key: 'addCommand' | 'importCommand' | 'manageCommand') => {
+  const command = pageActions.value[key];
+  if (command) methodStore.invokeMethod(command, {});
 };
 
 const back = () => {
@@ -519,6 +558,8 @@ const openLogsOverlay = () => {
 const refresh = async () => {
   if (["/preview"].includes(route.path)) {
     window.location.reload();
+  } else if (route.path === "/extensions") {
+    await extensionsStore.refresh({ force: true });
   } else if (["/subs", "/sync", "/files"].includes(route.path)) {
     initStores(true, true, true);
   } else {
@@ -667,6 +708,7 @@ const refresh = async () => {
         }
 
         .navBar-left-icon--refresh,
+        .navBar-left-icon--manage,
         .navBar-left-icon--add,
         .navBar-left-icon--import,
         .navBar-left-icon--search {

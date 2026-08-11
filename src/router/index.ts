@@ -13,6 +13,8 @@ import i18n from '@/locales';
 import File from '@/views/File.vue';
 import Sub from '@/views/Sub.vue';
 import ExtensionRouteOutlet from '@/components/ExtensionRouteOutlet.vue';
+import { frontendExtensionRouteContributions } from '@/extensions/frontend-catalog';
+import { EXTENSION_STORE_COMMANDS } from '@/extensions/registry';
 
 // import editScript from '@/views/editCode/editScript.vue';
 // import themeSetting from '@/views/themeSetting.vue';
@@ -20,7 +22,7 @@ import ExtensionRouteOutlet from '@/components/ExtensionRouteOutlet.vue';
 import { Dialog, Toast } from '@nutui/nutui';
 import { toRaw } from 'vue';
 import 'vue-router';
-import { createRouter, createWebHistory } from 'vue-router';
+import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router';
 
 // import { SwipeBack } from 'vue-swipe-back'
 
@@ -83,11 +85,27 @@ declare module 'vue-router' {
     backPath?: string;
     supportsListViewMode?: boolean;
     supportsListSearch?: boolean;
+    listSearchPlaceholderKey?: string;
     hideSideBarInWideScreenNarrowMode?: boolean;
+    extensionId?: string;
+    extensionSurfaceId?: string;
+    pageActions?: {
+      addCommand?: string;
+      addLabelKey?: string;
+      importCommand?: string;
+      importLabelKey?: string;
+      manageCommand?: string;
+    };
+    dynamicExtensionRoute?: boolean;
   }
 }
 
 const history = createWebHistory();
+const frontendExtensionRoutes: RouteRecordRaw[] = frontendExtensionRouteContributions.map(contribution => ({
+  path: contribution.path,
+  component: ExtensionRouteOutlet,
+  meta: contribution.meta,
+}));
 const router = createRouter({
   // scrollBehavior(to, from, savedPosition) {
   //   // console.log(`scrollBehavior ${from.path} => ${to.path}`)
@@ -122,6 +140,7 @@ const router = createRouter({
   routes: [
     {
       path: '/',
+      name: 'app-layout',
       component: AppLayout,
       redirect: '/subs',
       children: [
@@ -134,20 +153,9 @@ const router = createRouter({
             needNavBack: false,
             supportsListViewMode: true,
             supportsListSearch: true,
-          },
-        },
-        {
-          path: '/sync',
-          // Host-owned route slot. The outlet preserves the existing Sync
-          // surface when config-hosting is available and renders a recovery
-          // shell while the extension is disabled/missing/incompatible.
-          component: ExtensionRouteOutlet,
-          meta: {
-            title: 'sync',
-            needTabBar: true,
-            needNavBack: false,
-            supportsListViewMode: true,
-            supportsListSearch: true,
+            pageActions: {
+              addCommand: 'addSub',
+            },
           },
         },
         {
@@ -168,6 +176,9 @@ const router = createRouter({
             needNavBack: false,
             supportsListViewMode: true,
             supportsListSearch: true,
+            pageActions: {
+              addCommand: 'addFile',
+            },
           },
         },
         {
@@ -213,60 +224,37 @@ const router = createRouter({
             hideSideBarInWideScreenNarrowMode: true,
           },
         },
-        {
-          path: '/extensions/config-generator',
-          component: () => import('@/views/extensions/ConfigGeneratorList.vue'),
-          meta: {
-            title: 'configGenerator',
-            needTabBar: false,
-            needNavBack: true,
-            backPath: '/my',
-            supportsListViewMode: true,
-            hideSideBarInWideScreenNarrowMode: true,
-          },
-        },
+        ...frontendExtensionRoutes,
         {
           path: '/extensions',
           component: () => import('@/views/extensions/ExtensionStore.vue'),
           meta: {
             title: 'extensions',
-            needTabBar: false,
-            needNavBack: true,
-            backPath: '/my',
+            // The store is a first-class mobile destination.  Keeping the
+            // route in the tab-bar contract also makes browser back/forward
+            // preserve the selected bottom item.
+            needTabBar: true,
+            needNavBack: false,
+            supportsListSearch: true,
+            listSearchPlaceholderKey: 'navBar.extensionStore.searchPlaceholder',
+            pageActions: {
+              addCommand: EXTENSION_STORE_COMMANDS.add,
+              addLabelKey: 'navBar.extensionStore.add',
+              manageCommand: EXTENSION_STORE_COMMANDS.toggleManagement,
+            },
             hideSideBarInWideScreenNarrowMode: true,
           },
         },
         {
-          path: '/extensions/config-generator/edit/:name',
-          component: () => import('@/views/extensions/ConfigGenerator.vue'),
+          path: '/extensions/:extensionSlug/:extensionPath(.*)*',
+          component: ExtensionRouteOutlet,
           meta: {
-            title: 'configGenerator',
+            title: 'extensions',
             needTabBar: false,
             needNavBack: true,
-            backPath: '/extensions/config-generator',
+            backPath: '/extensions',
             hideSideBarInWideScreenNarrowMode: true,
-          },
-        },
-        {
-          path: '/extensions/config-generator/import',
-          component: () => import('@/views/extensions/ConfigGeneratorImport.vue'),
-          meta: {
-            title: 'configGenerator',
-            needTabBar: false,
-            needNavBack: true,
-            backPath: '/extensions/config-generator',
-            hideSideBarInWideScreenNarrowMode: true,
-          },
-        },
-        {
-          path: '/extensions/config-generator/preview/:name',
-          component: () => import('@/views/extensions/ConfigGeneratorPreview.vue'),
-          meta: {
-            title: 'preview',
-            needTabBar: false,
-            needNavBack: true,
-            backPath: '/extensions/config-generator',
-            hideSideBarInWideScreenNarrowMode: true,
+            dynamicExtensionRoute: true,
           },
         },
         // {
@@ -301,15 +289,6 @@ const router = createRouter({
           component: () => import('@/views/SubEditor.vue'),
           meta: {
             title: 'subEditor',
-            needTabBar: false,
-            needNavBack: true,
-          },
-        },
-        {
-          path: '/edit/sync/:id',
-          component: ExtensionRouteOutlet,
-          meta: {
-            title: 'syncEditor',
             needTabBar: false,
             needNavBack: true,
           },

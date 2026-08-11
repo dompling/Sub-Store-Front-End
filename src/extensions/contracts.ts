@@ -1,3 +1,5 @@
+import type { ExtensionDirectoryProjection } from '@/extensions/localDirectory';
+
 /**
  * Public frontend contracts for the Sub-Store extension host.
  *
@@ -7,11 +9,7 @@
  * shape here: this is the wire format shared by the host and every surface.
  */
 
-export type ExtensionKind =
-  | 'bundled'
-  | 'trusted-official'
-  | 'content'
-  | 'sandboxed';
+export type ExtensionKind = 'bundled' | 'trusted-official' | 'content' | 'sandboxed';
 
 export type ExtensionStatus =
   | 'bundled'
@@ -29,10 +27,7 @@ export type ExtensionStatus =
   | 'frontend-load-failed'
   | 'activation-failed';
 
-export type ExtensionInstallationStatus =
-  | 'never-installed'
-  | 'installed'
-  | 'removed';
+export type ExtensionInstallationStatus = 'never-installed' | 'installed' | 'removed';
 
 export type ExtensionDataStatus = 'none' | 'retained' | 'active';
 
@@ -48,15 +43,7 @@ export type ExtensionCodeStatus =
   | 'removed'
   | 'missing';
 
-export type ExtensionRuntimeName =
-  | 'node'
-  | 'qx'
-  | 'loon'
-  | 'surge'
-  | 'stash'
-  | 'shadowrocket'
-  | 'egern'
-  | string;
+export type ExtensionRuntimeName = 'node' | 'qx' | 'loon' | 'surge' | 'stash' | 'shadowrocket' | 'egern' | string;
 
 export interface ExtensionPublisher {
   id: string;
@@ -116,10 +103,38 @@ export interface ExtensionManifest {
   icon?: string;
   host?: {
     apiVersion?: string;
+    frontendApiVersion?: string;
+    implementationAbi?: string;
     frontend?: string;
     backend?: string;
     runtimes?: ExtensionRuntimeName[];
   };
+  frontend?: {
+    entrypoint?: string;
+    style?: string;
+    sdkSpecifier?: string;
+    uiKitAbi?: string;
+    implementationAbi?: string;
+    routeBase?: string;
+    openPath?: string;
+    embeddedBasePath?: string;
+    locales?: Record<string, string>;
+    assets?: Record<string, string | { path: string; digest?: string }>;
+    [key: string]: unknown;
+  };
+  trust?: {
+    level?: string;
+    allowedPublisher?: string;
+    allowlistedId?: boolean;
+    [key: string]: unknown;
+  };
+  entrypoints?: Record<string, unknown>;
+  requires?: {
+    hard?: string[];
+    optional?: string[];
+    [key: string]: unknown;
+  };
+  contributes?: Record<string, unknown>;
   permissions?: ExtensionPermission[];
   capabilities?: string[];
   routes?: ExtensionRouteContribution[];
@@ -144,6 +159,51 @@ export interface ExtensionInstallReceipt {
   retainedReason?: 'user-uninstalled' | 'backup-restored';
   installedAt?: number;
   enabled?: boolean;
+  fileDigests?: Record<string, string>;
+  rollbackAvailable?: boolean;
+  rollbackVersions?: string[];
+  [key: string]: unknown;
+}
+
+/**
+ * A catalog source managed by the extension host.  Source payloads are
+ * intentionally extensible because third-party catalogs may add health and
+ * provenance fields without requiring a frontend release.
+ */
+export interface ExtensionSource {
+  id: string;
+  url: string;
+  name?: string;
+  /** Explicit author of the catalog document; never inferred from its URL or entries. */
+  publisher: Pick<ExtensionPublisher, 'id' | 'name'> | null;
+  type?: 'github' | 'http' | 'https' | string;
+  status?: 'active' | 'ready' | 'refreshing' | 'failed' | 'disabled' | string;
+  enabled?: boolean;
+  error?: string;
+  /** Number of catalog entries returned by the host source projection. */
+  entryCount?: number;
+  /** Backward-compatible UI alias used by older source adapters. */
+  lastFetchedAt?: number;
+  extensionCount?: number;
+  lastError?: { code?: string; message?: string } | null;
+  revision?: string | number;
+  [key: string]: unknown;
+}
+
+export interface ExtensionArtifactSourceItem {
+  name: string;
+  displayName?: string;
+  [key: string]: unknown;
+}
+
+/** A source picker contribution exposed by an enabled backend extension. */
+export interface ExtensionArtifactSourceDescriptor {
+  type: string;
+  labelKey?: string;
+  platforms?: string[];
+  items: ExtensionArtifactSourceItem[];
+  ownerExtensionId?: string;
+  status: ExtensionStatus;
   [key: string]: unknown;
 }
 
@@ -161,6 +221,8 @@ export interface ExtensionAvailability {
   retainedReason?: 'user-uninstalled' | 'backup-restored';
   codeStatus?: ExtensionCodeStatus;
   dataStatus?: ExtensionDataStatus;
+  /** The installed manifest is retained, but its third-party catalog was removed. */
+  sourceMissing?: boolean;
 }
 
 export interface ExtensionRuntimeManifest {
@@ -172,8 +234,13 @@ export interface ExtensionRuntimeManifest {
   sdkAbi?: string;
   uiKitAbi?: string;
   runtime?: ExtensionRuntimeName;
-  capabilities?: string[];
-  managementMode?: 'token' | 'read-only' | string;
+  capabilities?:
+    | string[]
+    | {
+        supportsTrustedOfficialPackage?: boolean;
+        [key: string]: unknown;
+      };
+  managementMode?: 'open' | 'token' | 'read-only' | string;
   storageConsistency?: 'strong-cas' | 'single-writer-required' | string;
   restoreIsolation?: 'full' | 'data-only' | 'none' | string;
   /** Stable identity of the Host/storage instance that produced this snapshot. */
@@ -199,6 +266,10 @@ export interface ExtensionRuntimeEntry {
   manifest?: Partial<ExtensionManifest>;
   receipt?: ExtensionInstallReceipt;
   version?: string;
+  availableVersion?: string;
+  updateAvailable?: boolean;
+  rollbackAvailable?: boolean;
+  rollbackVersions?: string[];
   [key: string]: unknown;
 }
 
@@ -216,6 +287,16 @@ export interface ExtensionCatalogEntry extends Partial<ExtensionManifest> {
   latest?: boolean;
   yanked?: boolean;
   updateAvailable?: boolean;
+  installedVersion?: string;
+  availableVersion?: string;
+  rollbackAvailable?: boolean;
+  rollbackVersions?: string[];
+  /** Source identity is optional for bundled/legacy entries. */
+  sourceId?: string;
+  sourceUrl?: string;
+  sourceName?: string;
+  /** Installed community extension whose catalog source is no longer configured. */
+  sourceMissing?: boolean;
 }
 
 export interface ExtensionInstallTask {
@@ -235,6 +316,7 @@ export interface ExtensionRuntimeSnapshot {
   runtime: ExtensionRuntimeManifest | null;
   catalog: ExtensionCatalogEntry[];
   installed: ExtensionInstallReceipt[];
+  sources?: ExtensionSource[];
   tasks: ExtensionInstallTask[];
   fetchedAt: number;
 }
@@ -245,6 +327,31 @@ export interface ExtensionControlOptions {
   idempotencyKey?: string;
   version?: string;
   variant?: string;
+}
+
+export interface ExtensionSourceControlOptions extends ExtensionControlOptions {
+  url?: string;
+  name?: string;
+}
+
+export interface ExtensionLocalPackageInspection {
+  extensionId: string;
+  manifest: ExtensionManifest;
+  receipt?: ExtensionInstallReceipt | Record<string, unknown>;
+  selectedVariant?: string;
+  packageDigest?: string;
+  fileCount?: number;
+  totalBytes?: number;
+  verificationMode?: string;
+  compatibility?: unknown;
+  warnings?: unknown[];
+  diagnostics?: unknown[];
+  [key: string]: unknown;
+}
+
+export interface ExtensionLocalPackageRequest {
+  projection: ExtensionDirectoryProjection;
+  options?: ExtensionControlOptions;
 }
 
 export interface ExtensionApiEnvelope<T> {

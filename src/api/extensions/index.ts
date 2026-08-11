@@ -4,7 +4,11 @@ import { getApiRequestTimeout } from '@/utils/requestTimeout';
 import type {
   ExtensionApiEnvelope,
   ExtensionControlOptions,
+  ExtensionSourceControlOptions,
 } from '@/extensions/contracts';
+import type { ExtensionDirectoryProjection } from '@/extensions/localDirectory';
+
+export const EXTENSION_DIRECTORY_CONTENT_TYPE = 'application/vnd.substore.extension-directory+json';
 
 /**
  * Extension discovery intentionally uses a small, silent client.  Older
@@ -44,6 +48,18 @@ const controlBody = (options?: ExtensionControlOptions) => ({
   ...(options?.expectedRevision !== undefined ? { expectedRevision: options.expectedRevision } : {}),
 });
 
+const sourceControlBody = (options?: ExtensionSourceControlOptions) => ({
+  ...(options?.url ? { url: options.url } : {}),
+  ...(options?.name ? { name: options.name } : {}),
+  ...(options?.version ? { version: options.version } : {}),
+  ...(options?.variant ? { variant: options.variant } : {}),
+  ...(options?.expectedRevision !== undefined ? { expectedRevision: options.expectedRevision } : {}),
+  // Source mutations are retried after a revision fence.  Keeping the key in
+  // the body as well as the header lets hosts that only inspect JSON remain
+  // idempotent, while older hosts simply ignore the additive field.
+  ...(options?.idempotencyKey ? { idempotencyKey: options.idempotencyKey } : {}),
+});
+
 export function useExtensionsApi() {
   return {
     getRuntime: (etag?: string) => extensionRequest({
@@ -54,6 +70,18 @@ export function useExtensionsApi() {
     }),
     getCatalog: () => extensionRequest({ url: '/api/extensions/catalog', method: 'get' }),
     getInstalled: () => extensionRequest({ url: '/api/extensions/installed', method: 'get' }),
+    getArtifactSources: () => extensionRequest({
+      url: '/api/extensions/artifact-sources',
+      method: 'get',
+      validateStatus: status => (status >= 200 && status < 300) || status === 404 || status === 405,
+    }),
+    getSources: () => extensionRequest({
+      url: '/api/extensions/sources',
+      method: 'get',
+      // Source management was introduced after the catalog API.  A 404/405
+      // is a valid response for an older host and is handled by the store.
+      validateStatus: status => (status >= 200 && status < 300) || status === 404 || status === 405,
+    }),
     getOne: (id: string) => extensionRequest({
       url: `/api/extensions/${encodeURIComponent(id)}`,
       method: 'get',
@@ -65,6 +93,31 @@ export function useExtensionsApi() {
     getTask: (taskId: string) => extensionRequest({
       url: `/api/extensions/tasks/${encodeURIComponent(taskId)}`,
       method: 'get',
+    }),
+    inspectLocalPackage: (
+      projection: ExtensionDirectoryProjection,
+      options?: ExtensionControlOptions,
+    ) => extensionRequest({
+      url: '/api/admin/extensions/packages/inspect',
+      method: 'post',
+      headers: {
+        ...controlHeaders(options),
+        'Content-Type': EXTENSION_DIRECTORY_CONTENT_TYPE,
+      },
+      data: projection,
+    }),
+    installLocal: (
+      id: string,
+      projection: ExtensionDirectoryProjection,
+      options?: ExtensionControlOptions,
+    ) => extensionRequest({
+      url: `/api/admin/extensions/${encodeURIComponent(id)}/install-local`,
+      method: 'post',
+      headers: {
+        ...controlHeaders(options),
+        'Content-Type': EXTENSION_DIRECTORY_CONTENT_TYPE,
+      },
+      data: projection,
     }),
     install: (id: string, options?: ExtensionControlOptions) => extensionRequest({
       url: `/api/admin/extensions/${encodeURIComponent(id)}/install`,
@@ -107,6 +160,24 @@ export function useExtensionsApi() {
       method: 'delete',
       headers: controlHeaders(options),
       data: controlBody(options),
+    }),
+    addSource: (options: ExtensionSourceControlOptions) => extensionRequest({
+      url: '/api/admin/extensions/sources',
+      method: 'post',
+      headers: controlHeaders(options),
+      data: sourceControlBody(options),
+    }),
+    refreshSource: (id: string, options?: ExtensionSourceControlOptions) => extensionRequest({
+      url: `/api/admin/extensions/sources/${encodeURIComponent(id)}/refresh`,
+      method: 'post',
+      headers: controlHeaders(options),
+      data: sourceControlBody(options),
+    }),
+    removeSource: (id: string, options?: ExtensionSourceControlOptions) => extensionRequest({
+      url: `/api/admin/extensions/sources/${encodeURIComponent(id)}`,
+      method: 'delete',
+      headers: controlHeaders(options),
+      data: sourceControlBody(options),
     }),
   };
 }

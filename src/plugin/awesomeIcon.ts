@@ -34,6 +34,7 @@ import {
   faDesktop,
   faEye,
   faEllipsis,
+  faFolderOpen,
   faFileLines,
   faFloppyDisk,
   faGrip,
@@ -96,6 +97,7 @@ library.add(faXmark);
 library.add(faLocationArrow);
 library.add(faCode);
 library.add(faCodeBranch);
+library.add(faFolderOpen);
 library.add(faFileLines);
 library.add(faDesktop);
 library.add(faArrowRotateRight);

@@ -12,7 +12,15 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+dist-extensions
+*.tsbuildinfo
 *.local
+
+# Local agent and browser-test state
+.omc/
+.omx/
+.playwright-mcp/
+.ua/
 
 # Editor directories and files
 .vscode/*

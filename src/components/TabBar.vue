@@ -16,12 +16,6 @@
       />
 
       <nut-tabbar-item
-        v-show="!shouldHideSyncTab"
-        class="tabbar-item"
-        to="/sync"
-        icon="refresh2"
-      />
-      <nut-tabbar-item
         v-show="shouldShowShareTab"
         class="tabbar-item"
         to="/shares"
@@ -30,6 +24,15 @@
           <font-awesome-icon
             class="tabbar-share-icon"
             icon="fa-solid fa-share-nodes"
+          />
+        </template>
+      </nut-tabbar-item>
+
+      <nut-tabbar-item class="tabbar-item" to="/extensions">
+        <template #icon>
+          <font-awesome-icon
+            class="tabbar-extensions-icon"
+            icon="fa-solid fa-puzzle-piece"
           />
         </template>
       </nut-tabbar-item>
@@ -52,12 +55,17 @@
   const TAB_NAVIGATION = [
     { id: 'org.substore.core.subscriptions', path: '/subs' },
     { id: 'org.substore.core.files', path: '/files' },
-    { id: NAVIGATION_IDS.CONFIG_HOSTING, path: '/sync' },
     { id: 'org.substore.core.shares', path: '/shares' },
+    { id: NAVIGATION_IDS.EXTENSIONS_STORE, path: '/extensions' },
     { id: 'org.substore.core.settings', path: '/my' },
   ] as const;
   const navigationIdForPath = (path: string) => {
-    if (path === '/sync' || path.startsWith('/edit/sync/')) return NAVIGATION_IDS.CONFIG_HOSTING;
+    if (
+      path === '/extensions'
+      || path.startsWith('/extensions/')
+      || path === '/sync'
+      || path.startsWith('/edit/sync/')
+    ) return NAVIGATION_IDS.EXTENSIONS_STORE;
     return TAB_NAVIGATION.find(item => path === item.path || path.startsWith(`${item.path}/`))?.id
       || 'org.substore.core.settings';
   };
@@ -85,17 +93,6 @@
     }
 
     return !!appearanceSetting.value.istabBar2;
-  });
-  const shouldHideSyncTab = computed(() => {
-    if (hasCachedAppearanceNavigationSetting.value) {
-      return !!appearanceSetting.value.istabBar;
-    }
-
-    if (!hasFetchedSettings.value) {
-      return false;
-    }
-
-    return !!appearanceSetting.value.istabBar;
   });
   const shouldHideShareTab = computed(() => {
     if (hasCachedAppearanceNavigationSetting.value) {
@@ -160,6 +157,7 @@
     }
 
     :deep(.tabbar-item) {
+      min-width: 0;
       cursor: pointer;
 
       &.nut-tabbar-item__icon--unactive {
@@ -176,6 +174,18 @@
         height: 22px;
         font-size: 22px;
       }
+
+      .tabbar-extensions-icon {
+        width: 22px;
+        height: 22px;
+        font-size: 22px;
+      }
+    }
+
+    :deep(.nut-tabbar-item_icon-box_nav-word) {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
   }
 </style>

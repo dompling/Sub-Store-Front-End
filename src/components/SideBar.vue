@@ -22,16 +22,6 @@
         </div>
 
         <div 
-          v-show="!shouldHideSyncTab"
-          class="menu-item" 
-          :class="{ active: activeNavigationId === NAVIGATION_IDS.CONFIG_HOSTING }"
-          @click="router.push('/sync')"
-        >
-          <nut-icon name="refresh2" size="22px" />
-          <span class="label" v-show="isExpanded">{{ $t('tabBar.sync') }}</span>
-        </div>
-
-        <div 
           v-show="shouldShowShareTab"
           class="menu-item" 
           :class="{ active: activeNavigationId === CORE_NAVIGATION_IDS.SHARES }"
@@ -49,16 +39,6 @@
         >
           <font-awesome-icon icon="fa-solid fa-box-archive" style="font-size: 20px; width: 22px; height: 22px;" />
           <span class="label" v-show="isExpanded">{{ $t('tabBar.archive') }}</span>
-        </div>
-
-        <div
-          v-show="configGeneratorVisible"
-          class="menu-item"
-          :class="{ active: activeNavigationId === NAVIGATION_IDS.CONFIG_GENERATOR }"
-          @click="router.push('/extensions/config-generator')"
-        >
-          <font-awesome-icon icon="fa-solid fa-code-branch" style="font-size: 20px; width: 22px; height: 22px;" />
-          <span class="label" v-show="isExpanded">{{ $t('tabBar.configGenerator') }}</span>
         </div>
 
         <div
@@ -92,11 +72,10 @@ import { useSettingsStore } from '@/store/settings';
 import { useSystemStore } from "@/store/system";
 import { SIDEBAR_EXPANDED_BREAKPOINT } from "@/store/system";
 import { storeToRefs } from 'pinia';
-import { computed, onMounted } from 'vue';
+import { computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useWindowSize } from '@vueuse/core';
-import { useExtensionsStore } from '@/store/extensions';
-import { EXTENSION_IDS, NAVIGATION_IDS } from '@/extensions/registry';
+import { NAVIGATION_IDS } from '@/extensions/registry';
 
 const route = useRoute();
 const router = useRouter();
@@ -110,9 +89,12 @@ const CORE_NAVIGATION_IDS = {
 
 const activeNavigationId = computed(() => {
   const path = route.path;
-  if (path.startsWith('/extensions/config-generator')) return NAVIGATION_IDS.CONFIG_GENERATOR;
-  if (path === '/extensions') return NAVIGATION_IDS.EXTENSIONS_STORE;
-  if (path.startsWith('/edit/sync/') || path === '/sync') return NAVIGATION_IDS.CONFIG_HOSTING;
+  if (
+    path === '/extensions'
+    || path.startsWith('/extensions/')
+    || path === '/sync'
+    || path.startsWith('/edit/sync/')
+  ) return NAVIGATION_IDS.EXTENSIONS_STORE;
   if (path.startsWith('/files') || path.startsWith('/edit/files/')) return CORE_NAVIGATION_IDS.FILES;
   if (path.startsWith('/subs') || path.startsWith('/edit/subs/') || path.startsWith('/edit/collections/')) return CORE_NAVIGATION_IDS.SUBSCRIPTIONS;
   if (path.startsWith('/shares') || path.startsWith('/edit/shares/')) return CORE_NAVIGATION_IDS.SHARES;
@@ -129,7 +111,6 @@ const isExpanded = computed(() => {
 const globalStore = useGlobalStore();
 const settingsStore = useSettingsStore();
 const systemStore = useSystemStore();
-const extensionsStore = useExtensionsStore();
 
 const { appearanceSetting, hasFetchedSettings, hasCachedAppearanceNavigationSetting } = storeToRefs(settingsStore);
 const { env } = storeToRefs(globalStore);
@@ -145,17 +126,6 @@ const shouldHideFilesTab = computed(() => {
 
   return !!appearanceSetting.value.istabBar2;
 });
-const shouldHideSyncTab = computed(() => {
-  if (hasCachedAppearanceNavigationSetting.value) {
-    return !!appearanceSetting.value.istabBar;
-  }
-
-  if (!hasFetchedSettings.value) {
-    return false;
-  }
-
-  return !!appearanceSetting.value.istabBar;
-});
 const shouldHideShareTab = computed(() => {
   if (hasCachedAppearanceNavigationSetting.value) {
     return !!appearanceSetting.value.istabBar3;
@@ -169,16 +139,6 @@ const shouldHideShareTab = computed(() => {
 });
 const shouldShowShareTab = computed(() => {
   return !!env.value?.feature?.share && !shouldHideShareTab.value;
-});
-const configGeneratorVisible = computed(() => {
-  const availability = extensionsStore.availability(EXTENSION_IDS.CONFIG_GENERATOR);
-  return availability.status === 'enabled'
-    || !!(env.value?.feature?.configGenerator || env.value?.feature?.['config-generator']);
-});
-
-onMounted(() => {
-  extensionsStore.refresh({ silent: true });
-  extensionsStore.startRevisionSync();
 });
 
 </script>

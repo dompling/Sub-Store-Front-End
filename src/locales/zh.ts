@@ -115,6 +115,12 @@ export default {
       clear: '清空搜索',
       close: '关闭搜索',
     },
+    extensionStore: {
+      add: '添加扩展',
+      manage: '管理扩展',
+      done: '完成管理',
+      searchPlaceholder: '搜索扩展名称、描述或发布者',
+    },
     pagesTitle: {
       sub: '订阅管理',
       file: '文件管理',

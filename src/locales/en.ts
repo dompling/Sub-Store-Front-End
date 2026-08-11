@@ -115,6 +115,12 @@ export default {
       clear: "Clear search",
       close: "Close search",
     },
+    extensionStore: {
+      add: "Add extension",
+      manage: "Manage extensions",
+      done: "Finish managing",
+      searchPlaceholder: "Search extension name, description, or publisher",
+    },
     pagesTitle: {
       sub: "Subscription",
       file: "File",

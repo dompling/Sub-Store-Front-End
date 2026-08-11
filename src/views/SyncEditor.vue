@@ -327,8 +327,10 @@ import { useGlobalStore } from "@/store/global";
 import { useSettingsStore } from "@/store/settings";
 import { useSubsStore } from "@/store/subs";
 import { useSystemStore } from "@/store/system";
-import { useConfigGeneratorStore } from "@/store/configGenerator";
+import { useExtensionsStore } from "@/store/extensions";
+import { useExtensionsApi } from "@/api/extensions";
 import { useBackend } from "@/hooks/useBackend";
+import type { ExtensionArtifactSourceDescriptor } from "@/extensions/contracts";
 import { resolveArtifactIcon } from "@/utils/artifactIcon";
 import {
   getEditorActiveTab,
@@ -368,13 +370,14 @@ const subsStore = useSubsStore();
 const globalStore = useGlobalStore();
 const systemStore = useSystemStore();
 const settingsStore = useSettingsStore();
-const configGeneratorStore = useConfigGeneratorStore();
+const extensionsStore = useExtensionsStore();
+const extensionsApi = useExtensionsApi();
 const { showNotify } = useAppNotifyStore();
 const { env } = useBackend();
 const { bottomSafeArea } = storeToRefs(globalStore);
 const { navBarHeight } = storeToRefs(systemStore);
 const { appearanceSetting, githubProxy, githubProxyRegex } = storeToRefs(settingsStore);
-const { projects: configGeneratorProjects } = storeToRefs(configGeneratorStore);
+const extensionArtifactSources = ref<ExtensionArtifactSourceDescriptor[]>([]);
 
 const padding = bottomSafeArea.value + "px";
 const routeConfigName = computed(() => route.params.id as string);
@@ -469,6 +472,47 @@ const syncIcon = computed(() => {
 });
 const formIconFit = computed(() => resolveImageFit(form.iconFit, appearanceSetting.value.iconFit));
 
+const artifactSourceLabel = (source: ExtensionArtifactSourceDescriptor) => {
+  if (source.labelKey) {
+    const translated = t(source.labelKey);
+    if (translated && translated !== source.labelKey) return translated;
+  }
+  const ownerName = source.ownerExtensionId
+    ? extensionsStore.manifest(source.ownerExtensionId)?.name
+    : undefined;
+  return ownerName || source.type;
+};
+
+const unwrapArtifactSources = (response: any): ExtensionArtifactSourceDescriptor[] => {
+  if (response?.status === 404 || response?.status === 405) return [];
+  const body = response?.data;
+  const payload = body?.status === 'success' ? body.data : body;
+  const items = Array.isArray(payload)
+    ? payload
+    : Array.isArray(payload?.items)
+      ? payload.items
+      : Array.isArray(payload?.sources)
+        ? payload.sources
+        : [];
+  return items.filter((item: any) => (
+    item
+    && typeof item.type === 'string'
+    && Array.isArray(item.items)
+  )) as ExtensionArtifactSourceDescriptor[];
+};
+
+const fetchExtensionArtifactSources = async () => {
+  try {
+    extensionArtifactSources.value = unwrapArtifactSources(
+      await extensionsApi.getArtifactSources(),
+    );
+  } catch {
+    // A source discovery failure must not prevent editing built-in artifact
+    // sources. Existing extension-backed values remain visible as unavailable.
+    extensionArtifactSources.value = [];
+  }
+};
+
 const sourceOptions = computed(() => {
   const subsNameList = subsStore.subs.map(sub => ({
     name: sub.name,
@@ -518,17 +562,18 @@ const sourceOptions = computed(() => {
     });
   }
 
-  const configProjectItems = configGeneratorProjects.value;
-  if (configProjectItems.length > 0) {
-    options.push({
-      value: "config-project",
-      text: "Config Generator",
-      children: configProjectItems.map(item => ({
-        value: item.name,
-        text: item.displayName || item.name,
-      })),
+  extensionArtifactSources.value
+    .filter(source => source.status === 'enabled' && source.items.length > 0)
+    .forEach(source => {
+      options.push({
+        value: source.type,
+        text: artifactSourceLabel(source),
+        children: source.items.map(item => ({
+          value: item.name,
+          text: item.displayName || item.name,
+        })),
+      });
     });
-  }
 
   return options;
 });
@@ -620,9 +665,7 @@ watch(
 );
 
 onMounted(async () => {
-  if (env.value?.feature?.configGenerator || env.value?.feature?.['config-generator']) {
-    await configGeneratorStore.fetchProjects();
-  }
+  await fetchExtensionArtifactSources();
   if (isEditMode.value && artifactsStore.artifacts.length === 0) {
     await artifactsStore.fetchArtifactsData();
   }
