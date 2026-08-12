@@ -249,7 +249,6 @@
               <div><dt>{{ labels.status }}</dt><dd>{{ statusLabel(selectedCard.availability.status, selectedCard.availability.source, selectedCard.manifest?.kind) }}</dd></div>
               <div v-if="installedVersion(selectedCard)"><dt>{{ labels.installedVersion }}</dt><dd>v{{ installedVersion(selectedCard) }}</dd></div>
               <div v-if="availableVersion(selectedCard) && availableVersion(selectedCard) !== installedVersion(selectedCard)"><dt>{{ labels.availableVersion }}</dt><dd>v{{ availableVersion(selectedCard) }}</dd></div>
-              <div v-if="rollbackVersions(selectedCard).length"><dt>{{ labels.rollbackVersions }}</dt><dd>{{ rollbackVersions(selectedCard).map(version => `v${version}`).join('、') }}</dd></div>
               <div><dt>{{ labels.runtime }}</dt><dd>{{ runtimeLabel(selectedCard) }}</dd></div>
               <div v-if="selectedCard.availability.receipt?.selectedVariant"><dt>{{ labels.variant }}</dt><dd>{{ selectedCard.availability.receipt.selectedVariant }}</dd></div>
               <div v-if="selectedCard.availability.receipt?.codeStatus"><dt>{{ labels.codeStatus }}</dt><dd>{{ selectedCard.availability.receipt.codeStatus }}</dd></div>
@@ -259,6 +258,75 @@
               <div v-if="selectedCard.availability.receipt?.packageDigest"><dt>{{ labels.packageDigest }}</dt><dd :title="selectedCard.availability.receipt.packageDigest">{{ shortDigest(selectedCard.availability.receipt.packageDigest) }}</dd></div>
               <div v-if="selectedCard.availability.retainedReason"><dt>{{ labels.data }}</dt><dd>{{ retainedReasonLabel(selectedCard.availability.retainedReason) }}</dd></div>
             </dl>
+          </div>
+
+          <details
+            v-if="remoteReleases(selectedCard).length"
+            class="detail-section detail-version-section"
+            :open="versionHistoryOpen"
+            @toggle="syncVersionHistoryOpen"
+          >
+            <summary class="version-history-summary">
+              <span>{{ labels.remoteVersions }}</span>
+              <span class="version-history-count">{{ remoteReleases(selectedCard).length }}</span>
+              <font-awesome-icon class="version-history-chevron" icon="fa-solid fa-chevron-right" />
+            </summary>
+            <div class="release-list">
+              <article
+                v-for="release in remoteReleases(selectedCard)"
+                :key="release.version"
+                class="release-item"
+              >
+                <div class="release-copy">
+                  <div class="release-title-row">
+                    <strong>v{{ release.version }}</strong>
+                    <span v-if="release.version === installedVersion(selectedCard)" class="release-badge current">
+                      {{ labels.currentVersion }}
+                    </span>
+                    <span v-if="isLatestRelease(selectedCard, release)" class="release-badge latest">
+                      {{ labels.latestVersion }}
+                    </span>
+                    <span v-if="release.yanked" class="release-badge yanked">
+                      {{ labels.yankedVersion }}
+                    </span>
+                  </div>
+                  <span v-if="formatReleaseDate(release.releasedAt)" class="release-meta">
+                    {{ labels.releaseDate }} {{ formatReleaseDate(release.releasedAt) }}
+                  </span>
+                  <span v-if="release.gitTag || release.gitCommit" class="release-meta" :title="releaseRevisionTitle(release)">
+                    {{ labels.gitRevision }} · {{ releaseRevisionLabel(release) }}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  class="details-button release-action"
+                  :disabled="releaseActionDisabled(selectedCard, release)"
+                  :title="sourceIsMissing(selectedCard) ? labels.sourceUnavailable : ''"
+                  @click="confirmVersionSwitch(selectedCard, release)"
+                >
+                  {{ visibleReleaseActionLabel(selectedCard, release) }}
+                </button>
+              </article>
+            </div>
+          </details>
+
+          <div v-if="canRollback(selectedCard)" class="detail-section detail-local-rollback-section">
+            <h3>{{ labels.localRollback }}</h3>
+            <div class="local-rollback-summary">
+              <span>
+                {{ rollbackVersions(selectedCard).length
+                  ? rollbackVersions(selectedCard).map(version => `v${version}`).join('、')
+                  : labels.previousVerifiedVersion }}
+              </span>
+              <button
+                type="button"
+                class="details-button"
+                :disabled="isActionLoading(selectedCard.id) || !extensionStore.canManage"
+                @click="performVersionAction(selectedCard, 'rollback')"
+              >
+                {{ labels.rollback }}
+              </button>
+            </div>
           </div>
 
           <div v-if="sourceIsMissing(selectedCard)" class="detail-source-warning" role="status">
@@ -307,15 +375,6 @@
             @click="confirmUninstall(selectedCard)"
           >
             {{ labels.uninstall }}
-          </button>
-          <button
-            v-if="canRollback(selectedCard)"
-            type="button"
-            class="details-button"
-            :disabled="isActionLoading(selectedCard.id) || !extensionStore.canManage"
-            @click="performVersionAction(selectedCard, 'rollback')"
-          >
-            {{ labels.rollback }}
           </button>
           <button
             v-if="canUpdate(selectedCard)"
@@ -538,6 +597,7 @@ import { useExtensionsStore } from '@/store/extensions';
 import type {
   ExtensionAvailability,
   ExtensionCatalogEntry,
+  ExtensionCatalogRelease,
   ExtensionLocalPackageInspection,
   ExtensionManifest,
   ExtensionSource,
@@ -562,6 +622,8 @@ type ExtensionCard = ExtensionCatalogEntry & {
   source?: string;
   sourceName?: string;
 };
+
+type ReleaseActionKind = 'install' | 'upgrade' | 'downgrade' | 'reinstall' | 'current';
 
 const EXTENSION_LAUNCHER_ORDER_KEY = 'sub-store-extension-launcher-order';
 const INSTALLED_EXTENSION_STATUSES = new Set<ExtensionStatus>([
@@ -588,6 +650,7 @@ const { showNotify } = useAppNotifyStore();
 
 const addVisible = ref(false);
 const detailVisible = ref(false);
+const versionHistoryOpen = ref(false);
 const sourcesVisible = ref(false);
 const localInstallVisible = ref(false);
 const localDirectoryInput = ref<HTMLInputElement | null>(null);
@@ -674,6 +737,23 @@ const labels = computed(() => ({
   rollbackVersions: isZh.value ? '可回滚版本' : 'Rollback versions',
   update: isZh.value ? '更新' : 'Update',
   rollback: isZh.value ? '回滚' : 'Roll back',
+  localRollback: isZh.value ? '本地回滚' : 'Local rollback',
+  previousVerifiedVersion: isZh.value ? '上一已验证版本' : 'Previous verified version',
+  remoteVersions: isZh.value ? '历史版本' : 'Version history',
+  currentVersion: isZh.value ? '当前' : 'Current',
+  latestVersion: isZh.value ? '最新' : 'Latest',
+  yankedVersion: isZh.value ? '已撤回' : 'Yanked',
+  viewOnlyVersion: isZh.value ? '仅供查看' : 'View only',
+  installVersion: isZh.value ? '安装此版本' : 'Install this version',
+  upgradeVersion: isZh.value ? '升级到此版本' : 'Upgrade to this version',
+  downgradeVersion: isZh.value ? '降级到此版本' : 'Downgrade to this version',
+  reinstallVersion: isZh.value ? '重新安装' : 'Reinstall',
+  downgradeTitle: isZh.value ? '降级扩展？' : 'Downgrade extension?',
+  downgradeDescription: isZh.value
+    ? '旧版本可能无法读取新版本写入的数据。确认后将切换到所选的历史版本。'
+    : 'An older release may not understand data written by the current version. Continue with the selected release?',
+  releaseDate: isZh.value ? '发布于' : 'Released',
+  gitRevision: isZh.value ? 'Git 版本' : 'Git revision',
 }));
 
 const extensionCard = (entry: ExtensionCatalogEntry): ExtensionCard => ({
@@ -959,7 +1039,7 @@ const shortDigest = (digest?: string) => digest ? `${digest.slice(0, 10)}…${di
 const installedVersion = (card: ExtensionCard) => String(
   card.installedVersion
   || card.availability.receipt?.version
-  || card.availability.manifest?.version
+  || (isInstalledCard(card) ? card.availability.manifest?.version : '')
   || '',
 );
 
@@ -971,6 +1051,131 @@ const rollbackVersions = (card: ExtensionCard) => {
   const versions = card.rollbackVersions || card.availability.receipt?.rollbackVersions;
   return Array.isArray(versions) ? versions.filter((version): version is string => typeof version === 'string') : [];
 };
+
+const compareVersionIdentifiers = (left: string, right: string) => {
+  const leftNumeric = /^\d+$/.test(left);
+  const rightNumeric = /^\d+$/.test(right);
+  if (leftNumeric && rightNumeric) return Number(left) - Number(right);
+  if (leftNumeric !== rightNumeric) return leftNumeric ? -1 : 1;
+  return left.localeCompare(right);
+};
+
+const compareVersions = (left: string, right: string) => {
+  const parse = (version: string) => {
+    const match = version.trim().replace(/^v/i, '').match(
+      /^(\d+)(?:\.(\d+))?(?:\.(\d+))?(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?$/,
+    );
+    if (!match) return null;
+    return {
+      numbers: [Number(match[1]), Number(match[2] || 0), Number(match[3] || 0)],
+      prerelease: match[4]?.match(/[^.]+/g) || [],
+    };
+  };
+  const parsedLeft = parse(left);
+  const parsedRight = parse(right);
+  if (!parsedLeft || !parsedRight) return left.localeCompare(right);
+  for (let index = 0; index < 3; index += 1) {
+    const difference = parsedLeft.numbers[index] - parsedRight.numbers[index];
+    if (difference) return difference;
+  }
+  if (!parsedLeft.prerelease.length || !parsedRight.prerelease.length) {
+    if (!parsedLeft.prerelease.length && !parsedRight.prerelease.length) return 0;
+    return parsedLeft.prerelease.length ? -1 : 1;
+  }
+  const length = Math.max(parsedLeft.prerelease.length, parsedRight.prerelease.length);
+  for (let index = 0; index < length; index += 1) {
+    if (parsedLeft.prerelease[index] === undefined) return -1;
+    if (parsedRight.prerelease[index] === undefined) return 1;
+    const difference = compareVersionIdentifiers(
+      parsedLeft.prerelease[index],
+      parsedRight.prerelease[index],
+    );
+    if (difference) return difference;
+  }
+  return 0;
+};
+
+const remoteReleases = (card: ExtensionCard) => {
+  if (!Array.isArray(card.releases)) return [];
+  return card.releases
+    .filter((release): release is ExtensionCatalogRelease => Boolean(release?.version))
+    .slice()
+    .sort((left, right) => compareVersions(right.version, left.version));
+};
+
+const isLatestRelease = (card: ExtensionCard, release: ExtensionCatalogRelease) => (
+  release.latest === true
+  || release.version === availableVersion(card)
+);
+
+const formatReleaseDate = (value?: string | number) => {
+  if (value === undefined || value === null || value === '') return '';
+  const numeric = typeof value === 'number' ? value : Number(value);
+  const date = Number.isFinite(numeric)
+    ? new Date(numeric < 1_000_000_000_000 ? numeric * 1000 : numeric)
+    : new Date(String(value));
+  if (Number.isNaN(date.getTime())) return '';
+  return new Intl.DateTimeFormat(isZh.value ? 'zh-CN' : 'en', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  }).format(date);
+};
+
+const shortCommit = (commit?: string) => commit?.trim().slice(0, 8) || '';
+
+const releaseRevisionLabel = (release: ExtensionCatalogRelease) => [
+  release.gitTag?.trim(),
+  shortCommit(release.gitCommit),
+].filter(Boolean).join(' · ');
+
+const releaseRevisionTitle = (release: ExtensionCatalogRelease) => [
+  release.gitTag?.trim(),
+  release.gitCommit?.trim(),
+].filter(Boolean).join(' · ');
+
+const hasInstalledPackage = (card: ExtensionCard) => (
+  card.availability.receipt?.installationStatus === 'installed'
+  || ['installed', 'enabled', 'disabled', 'frontend-load-failed', 'activation-failed'].includes(card.availability.status)
+);
+
+const needsPackageRestore = (card: ExtensionCard) => (
+  card.availability.status === 'reinstall-required'
+  || ['removed', 'missing'].includes(String(card.availability.receipt?.codeStatus || ''))
+);
+
+const releaseActionKind = (card: ExtensionCard, release: ExtensionCatalogRelease): ReleaseActionKind => {
+  const current = installedVersion(card);
+  if (needsPackageRestore(card)) return 'reinstall';
+  if (!hasInstalledPackage(card)) return 'install';
+  const comparison = compareVersions(release.version, current);
+  if (comparison > 0) return 'upgrade';
+  if (comparison < 0) return 'downgrade';
+  return 'current';
+};
+
+const releaseActionLabel = (card: ExtensionCard, release: ExtensionCatalogRelease) => ({
+  install: labels.value.installVersion,
+  upgrade: labels.value.upgradeVersion,
+  downgrade: labels.value.downgradeVersion,
+  reinstall: labels.value.reinstallVersion,
+  current: labels.value.currentVersion,
+})[releaseActionKind(card, release)];
+
+const visibleReleaseActionLabel = (card: ExtensionCard, release: ExtensionCatalogRelease) => (
+  release.installable === false || release.yanked === true
+    ? labels.value.viewOnlyVersion
+    : releaseActionLabel(card, release)
+);
+
+const releaseActionDisabled = (card: ExtensionCard, release: ExtensionCatalogRelease) => (
+  release.installable === false
+  || release.yanked === true
+  || releaseActionKind(card, release) === 'current'
+  || sourceIsMissing(card)
+  || isActionLoading(card.id)
+  || !extensionStore.canManage
+);
 
 const versionSummary = (card: ExtensionCard) => {
   const installed = installedVersion(card);
@@ -1268,8 +1473,13 @@ const removeOneSource = (sourceId: string) => {
 
 const openDetails = (id: string) => {
   selectedId.value = id;
+  versionHistoryOpen.value = false;
   extensionStore.lastActionError = '';
   detailVisible.value = true;
+};
+
+const syncVersionHistoryOpen = (event: Event) => {
+  versionHistoryOpen.value = (event.currentTarget as HTMLDetailsElement).open;
 };
 
 const cancelAppLongPress = () => {
@@ -1356,6 +1566,39 @@ const performVersionAction = async (card: ExtensionCard, action: 'update' | 'rol
   } else {
     showNotify({ title: extensionStore.lastActionError || labels.value.actionFailed, type: 'danger' });
   }
+};
+
+const performReleaseAction = async (card: ExtensionCard, release: ExtensionCatalogRelease) => {
+  if (releaseActionDisabled(card, release)) return;
+  actionLoadingId.value = card.id;
+  const succeeded = hasInstalledPackage(card) && !needsPackageRestore(card)
+    ? await extensionStore.switchVersion(card.id, release.version)
+    : await extensionStore.installVersion(card.id, release.version);
+  actionLoadingId.value = '';
+  if (succeeded) {
+    showNotify({ title: labels.value.actionSuccess, type: 'primary' });
+  } else {
+    showNotify({ title: extensionStore.lastActionError || labels.value.actionFailed, type: 'danger' });
+  }
+};
+
+const confirmVersionSwitch = (card: ExtensionCard, release: ExtensionCatalogRelease) => {
+  if (releaseActionDisabled(card, release)) return;
+  if (releaseActionKind(card, release) !== 'downgrade') {
+    void performReleaseAction(card, release);
+    return;
+  }
+  Dialog({
+    ...extensionConfirmDialogLayer,
+    title: labels.value.downgradeTitle,
+    content: `${labels.value.downgradeDescription}\n${installedVersion(card)} → ${release.version}`,
+    textAlign: 'left',
+    okText: labels.value.downgradeVersion,
+    cancelText: labels.value.close,
+    closeOnPopstate: true,
+    lockScroll: false,
+    onOk: async () => performReleaseAction(card, release),
+  });
 };
 
 const confirmUninstall = (card: ExtensionCard) => {
@@ -2166,6 +2409,133 @@ onBeforeUnmount(() => {
   white-space: nowrap;
 }
 
+.release-list {
+  display: grid;
+  gap: 1px;
+  margin-top: 8px;
+  overflow: hidden;
+  border-radius: 9px;
+  background: var(--divider-color);
+}
+
+.version-history-summary {
+  display: flex;
+  min-height: 38px;
+  align-items: center;
+  gap: 8px;
+  border-radius: 9px;
+  padding: 0 10px;
+  color: var(--primary-text-color);
+  background: var(--card-color);
+  font-size: 13px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.version-history-summary::-webkit-details-marker { display: none; }
+
+.version-history-count {
+  margin-left: auto;
+  color: var(--lowest-text-color);
+  font-size: 10px;
+}
+
+.version-history-chevron {
+  color: var(--lowest-text-color);
+  font-size: 9px;
+  transition: transform 160ms ease;
+}
+
+.detail-version-section[open] .version-history-chevron { transform: rotate(90deg); }
+
+.release-item {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  background: var(--card-color);
+}
+
+.release-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.release-title-row {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+}
+
+.release-title-row strong {
+  color: var(--primary-text-color);
+  font-size: 12px;
+}
+
+.release-badge {
+  border-radius: 999px;
+  padding: 2px 6px;
+  color: var(--comment-text-color);
+  background: var(--background-color);
+  font-size: 9px;
+  line-height: 1.2;
+}
+
+.release-badge.current {
+  color: var(--succeed-color);
+  background: color-mix(in srgb, var(--succeed-color) 12%, transparent);
+}
+
+.release-badge.latest {
+  color: var(--primary-color);
+  background: color-mix(in srgb, var(--primary-color) 12%, transparent);
+}
+
+.release-badge.yanked {
+  color: var(--danger-color);
+  background: color-mix(in srgb, var(--danger-color) 10%, transparent);
+}
+
+.release-meta {
+  overflow: hidden;
+  color: var(--lowest-text-color);
+  font-size: 10px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.release-action {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.local-rollback-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+  border-radius: 9px;
+  padding: 9px 10px;
+  background: var(--card-color);
+}
+
+.local-rollback-summary > span {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  color: var(--comment-text-color);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .detail-token-section {
   margin-top: 20px;
 }
@@ -2645,6 +3015,11 @@ onBeforeUnmount(() => {
 
 @media screen and (max-width: 420px) {
   .detail-facts { grid-template-columns: minmax(0, 1fr); }
+  .release-item {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .release-action { width: 100%; }
 }
 
 @media (prefers-reduced-motion: reduce) {

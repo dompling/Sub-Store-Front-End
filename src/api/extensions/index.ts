@@ -43,7 +43,9 @@ const controlHeaders = (options?: ExtensionControlOptions) => {
 };
 
 const controlBody = (options?: ExtensionControlOptions) => ({
-  ...(options?.version ? { version: options.version } : {}),
+  // A version is always selected from catalog release metadata. The backend
+  // resolves its declared package URL/digest; clients must never derive one.
+  ...(options?.version?.trim() ? { version: options.version.trim() } : {}),
   ...(options?.variant ? { variant: options.variant } : {}),
   ...(options?.expectedRevision !== undefined ? { expectedRevision: options.expectedRevision } : {}),
 });

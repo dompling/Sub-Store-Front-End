@@ -11,6 +11,7 @@ import { findFrontendExtensionDefinition } from '@/extensions/frontend-catalog';
 import type {
   ExtensionAvailability,
   ExtensionCatalogEntry,
+  ExtensionCatalogRelease,
   ExtensionControlOptions,
   ExtensionDataStatus,
   ExtensionInstallReceipt,
@@ -195,6 +196,27 @@ const normalizeReceipt = (item: any): ExtensionInstallReceipt | null => {
   } as ExtensionInstallReceipt;
 };
 
+const normalizeCatalogReleases = (value: unknown): ExtensionCatalogRelease[] => {
+  if (!Array.isArray(value)) return [];
+  const byVersion = new Map<string, ExtensionCatalogRelease>();
+  value.forEach((release) => {
+    if (!isRecord(release)) return;
+    const version = typeof release.version === 'string' ? release.version.trim() : '';
+    if (!version || byVersion.has(version)) return;
+    byVersion.set(version, {
+      ...release,
+      version,
+      ...(typeof release.gitTag === 'string' && release.gitTag.trim()
+        ? { gitTag: release.gitTag.trim() }
+        : {}),
+      ...(typeof release.gitCommit === 'string' && release.gitCommit.trim()
+        ? { gitCommit: release.gitCommit.trim() }
+        : {}),
+    } as ExtensionCatalogRelease);
+  });
+  return [...byVersion.values()];
+};
+
 const normalizeCatalogEntry = (item: any): ExtensionCatalogEntry | null => {
   if (!isRecord(item) || typeof item.id !== 'string') return null;
   const frontendManifest = findFrontendManifest(item.id);
@@ -213,6 +235,7 @@ const normalizeCatalogEntry = (item: any): ExtensionCatalogEntry | null => {
     },
     name: item.name || frontendManifest?.name || item.id,
     version: item.version || frontendManifest?.version || '0.0.0',
+    releases: normalizeCatalogReleases(item.releases),
     ...(sourceUrl ? { sourceUrl } : {}),
     ...(typeof item.sourceName === 'string' && item.sourceName.trim() ? { sourceName: item.sourceName.trim() } : {}),
   } as ExtensionCatalogEntry;
@@ -463,10 +486,14 @@ export const useExtensionsStore = defineStore('extensions', {
 
               // A source may be removed after an extension was installed. The
               // host still returns the receipt's manifest snapshot so the
-              // installed tab remains actionable; merge that snapshot into
-              // the catalog instead of dropping the card.
+              // installed tab remains actionable. Only synthesize a catalog
+              // entry when discovery no longer provides that extension: a
+              // retained local snapshot must never overwrite a newer remote
+              // catalog candidate during reinstall.
+              const catalogEntryIds = new Set(this.catalog.map(entry => entry.id));
               const installedSnapshots = this.installed
                 .map((receipt) => {
+                  if (catalogEntryIds.has(receipt.extensionId)) return null;
                   const raw = receipt as Record<string, any>;
                   const snapshot = isRecord(raw.manifestSnapshot)
                     ? raw.manifestSnapshot
@@ -744,6 +771,9 @@ export const useExtensionsStore = defineStore('extensions', {
     async install(extensionId: string, options: Partial<ExtensionControlOptions> = {}) {
       return this.runControlAction('install', extensionId, options);
     },
+    async installVersion(extensionId: string, version: string) {
+      return this.install(extensionId, { version: version.trim() });
+    },
     async inspectLocalPackage(projection: import('@/extensions/localDirectory').ExtensionDirectoryProjection) {
       this.lastActionError = '';
       try {
@@ -805,6 +835,9 @@ export const useExtensionsStore = defineStore('extensions', {
     },
     async update(extensionId: string, options: Partial<ExtensionControlOptions> = {}) {
       return this.runControlAction('update', extensionId, options);
+    },
+    async switchVersion(extensionId: string, version: string) {
+      return this.update(extensionId, { version: version.trim() });
     },
     async rollback(extensionId: string, options: Partial<ExtensionControlOptions> = {}) {
       return this.runControlAction('rollback', extensionId, options);

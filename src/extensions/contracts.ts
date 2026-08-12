@@ -274,6 +274,31 @@ export interface ExtensionRuntimeEntry {
   [key: string]: unknown;
 }
 
+/**
+ * An immutable release advertised by a catalog source.
+ *
+ * `version` remains the user-facing SemVer while Git metadata records the
+ * repository revision that produced it. Package locations and digests stay
+ * catalog-declared so the frontend never constructs a download URL from a
+ * user-selected version.
+ */
+export interface ExtensionCatalogRelease {
+  version: string;
+  releasedAt?: string | number;
+  gitTag?: string;
+  gitCommit?: string;
+  manifest?: Partial<ExtensionManifest>;
+  packageUrl?: string;
+  packageUrls?: Record<string, string>;
+  packageDigest?: string;
+  packageDigests?: Record<string, string>;
+  latest?: boolean;
+  yanked?: boolean;
+  /** False when provenance is retained but no verified package is published. */
+  installable?: boolean;
+  [key: string]: unknown;
+}
+
 export interface ExtensionCatalogEntry extends Partial<ExtensionManifest> {
   id: string;
   name: string;
@@ -292,6 +317,8 @@ export interface ExtensionCatalogEntry extends Partial<ExtensionManifest> {
   availableVersion?: string;
   rollbackAvailable?: boolean;
   rollbackVersions?: string[];
+  /** Remote, source-backed releases. Local rollback packages are separate. */
+  releases?: ExtensionCatalogRelease[];
   /** Source identity is optional for bundled/legacy entries. */
   sourceId?: string;
   sourceUrl?: string;
