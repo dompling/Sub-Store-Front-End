@@ -44,6 +44,9 @@ export default {
       dynamicImportFailedContent: '请刷新后继续操作',
       reloadNow: '刷新前端',
       backHome: '返回首页',
+      updateAvailableTitle: '发现前端更新',
+      updateAvailableContent: '新版本已经准备好，刷新后即可使用。',
+      updateLater: '稍后',
     },
     share: {
       title: '分享',

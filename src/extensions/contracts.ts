@@ -355,6 +355,7 @@ export interface ExtensionControlOptions {
   idempotencyKey?: string;
   version?: string;
   variant?: string;
+  reinstall?: boolean;
 }
 
 export interface ExtensionSourceControlOptions extends ExtensionControlOptions {

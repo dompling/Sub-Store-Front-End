@@ -17,6 +17,7 @@ import '@/assets/styles/reduced-motion-fix.scss';
 import { createPinia } from 'pinia';
 import 'virtual:svg-icons-register';
 import { createApp } from 'vue';
+import { registerPwaUpdate } from '@/utils/registerPwaUpdate';
 
 import App from './App.vue';
 
@@ -47,4 +48,5 @@ export function initializeApp() {
   app.component('font-awesome-icon', FontAwesomeIcon);
   app.component('svg-icon', SvgIcon);
   app.mount('#app');
+  registerPwaUpdate();
 }

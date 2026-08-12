@@ -839,6 +839,12 @@ export const useExtensionsStore = defineStore('extensions', {
     async switchVersion(extensionId: string, version: string) {
       return this.update(extensionId, { version: version.trim() });
     },
+    async reinstallVersion(extensionId: string, version: string) {
+      return this.update(extensionId, {
+        version: version.trim(),
+        reinstall: true,
+      });
+    },
     async rollback(extensionId: string, options: Partial<ExtensionControlOptions> = {}) {
       return this.runControlAction('rollback', extensionId, options);
     },
@@ -903,13 +909,14 @@ export const useExtensionsStore = defineStore('extensions', {
 
     async refreshSource(sourceId: string) {
       this.sourceActionError = '';
+      let succeeded = false;
       try {
         const response = await api.refreshSource(sourceId, this.sourceControlOptions());
         if (!response || response.status < 200 || response.status >= 300) {
           this.sourceActionError = responseError(response);
           return false;
         }
-        await this.refresh({ silent: true, force: true });
+        succeeded = true;
         return true;
       } catch (error: any) {
         if (isAdminAuthFailure(error)) this.clearAdminToken();
@@ -917,6 +924,11 @@ export const useExtensionsStore = defineStore('extensions', {
           ? responseError(error.response)
           : error?.message || 'EXTENSION_SOURCE_REFRESH_FAILED';
         return false;
+      } finally {
+        // The Host records the failed source state before returning an error.
+        // Always re-read it so the card and notification cannot disagree.
+        await this.refresh({ silent: true, force: true });
+        if (succeeded) this.sourceActionError = '';
       }
     },
 
@@ -940,7 +952,38 @@ export const useExtensionsStore = defineStore('extensions', {
     },
 
     async refreshOnRevisionFence() {
-      return this.refresh({ silent: true, force: true });
+      const requestHostUrl = normalizeHostIdentity(getHostAPIUrl());
+      if (this.runtimeHostUrl && this.runtimeHostUrl !== requestHostUrl) {
+        return this.refresh({ silent: true, force: true });
+      }
+      try {
+        const response = await api.getRuntime(this.runtime?.etag);
+        if (normalizeHostIdentity(getHostAPIUrl()) !== requestHostUrl) {
+          this.resetRuntimeSnapshot(normalizeHostIdentity(getHostAPIUrl()));
+          return false;
+        }
+        if (response?.status === 304) return true;
+        if (!response || response.status < 200 || response.status >= 300) {
+          return false;
+        }
+        const runtime = unwrapRuntime(response);
+        if (!runtime) return false;
+        const unchanged = Boolean(
+          this.runtime
+          && String(runtime.storageIdentity || runtime.instanceId || '')
+            === String(this.runtime.storageIdentity || this.runtime.instanceId || '')
+          && String(runtime.revision) === String(this.runtime.revision),
+        );
+        if (unchanged) {
+          runtime.etag = response.headers?.etag || runtime.etag;
+          this.runtime = runtime;
+          this.runtimeHostUrl = requestHostUrl;
+          return true;
+        }
+        return this.refresh({ silent: true, force: true });
+      } catch {
+        return false;
+      }
     },
 
     startRevisionSync() {

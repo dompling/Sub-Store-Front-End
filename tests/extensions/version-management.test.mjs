@@ -73,6 +73,7 @@ test('extension details expose remote history and explicit version switching', (
   assert.match(store, /normalizeCatalogReleases/);
   assert.match(store, /async installVersion\(extensionId: string, version: string/);
   assert.match(store, /async switchVersion\(extensionId: string, version: string/);
+  assert.match(store, /async reinstallVersion\(extensionId: string, version: string/);
   assert.match(view, /remoteReleases\(selectedCard\)/);
   assert.match(view, /<details[\s\S]*?v-if="remoteReleases\(selectedCard\)\.length"/);
   assert.match(view, /labels\.remoteVersions/);
@@ -91,7 +92,8 @@ test('remote downgrade confirmation and local rollback remain separate actions',
   assert.match(view, /await extensionStore\.switchVersion\(card\.id, release\.version\)/);
   assert.match(view, /hasInstalledPackage\(card\) && !needsPackageRestore\(card\)/);
   assert.match(view, /await extensionStore\.rollback\(card\.id\)/);
-  assert.match(view, /releaseActionKind\(card, release\) === 'current'/);
+  assert.match(view, /kind === 'current'/);
+  assert.match(view, /await extensionStore\.reinstallVersion\(card\.id, release\.version\)/);
   assert.match(view, /isInstalledCard\(card\) \? card\.availability\.manifest\?\.version : ''/);
   assert.match(view, /versionHistoryOpen\.value = false/);
 });

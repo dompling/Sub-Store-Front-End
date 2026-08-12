@@ -42,7 +42,10 @@ export default {
       "dynamicImportFailedTitle": "Фронтенд обновлён",
       "dynamicImportFailedContent": "Обновите страницу, чтобы продолжить.",
       "reloadNow": "Обновить фронтенд",
-      "backHome": "Вернуться на главную"
+      "backHome": "Вернуться на главную",
+      "updateAvailableTitle": "Доступно обновление фронтенда",
+      "updateAvailableContent": "Новая версия готова. Обновите страницу, чтобы использовать её.",
+      "updateLater": "Позже"
     },
     "share": {
       "title": "Поделиться",

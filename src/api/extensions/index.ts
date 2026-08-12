@@ -47,6 +47,7 @@ const controlBody = (options?: ExtensionControlOptions) => ({
   // resolves its declared package URL/digest; clients must never derive one.
   ...(options?.version?.trim() ? { version: options.version.trim() } : {}),
   ...(options?.variant ? { variant: options.variant } : {}),
+  ...(options?.reinstall === true ? { reinstall: true } : {}),
   ...(options?.expectedRevision !== undefined ? { expectedRevision: options.expectedRevision } : {}),
 });
 

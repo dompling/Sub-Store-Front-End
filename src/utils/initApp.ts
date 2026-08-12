@@ -78,6 +78,7 @@ export const initStores = async (
     // 时才读取 Artifact，避免 disabled/missing 的结构化 409 被误判为
     // 整个 Sub-Store 后端不可用。
     await extensionsStore.refresh({ silent: true });
+    extensionsStore.startRevisionSync();
     const configHosting = extensionsStore.availability(
       EXTENSION_IDS.CONFIG_HOSTING
     );

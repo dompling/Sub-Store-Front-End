@@ -113,6 +113,10 @@ const viteConfig = defineConfig((mode: ConfigEnv) => {
               handler: "StaleWhileRevalidate",
               options: {
                 cacheName: "js-cache",
+                expiration: {
+                  maxEntries: 24,
+                  maxAgeSeconds: 7 * 24 * 60 * 60,
+                },
               },
             },
             {
@@ -120,6 +124,10 @@ const viteConfig = defineConfig((mode: ConfigEnv) => {
               handler: "CacheFirst",
               options: {
                 cacheName: "asset-cache",
+                expiration: {
+                  maxEntries: 160,
+                  maxAgeSeconds: 30 * 24 * 60 * 60,
+                },
               },
             },
           ],

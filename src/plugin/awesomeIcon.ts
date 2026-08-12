@@ -66,7 +66,9 @@ import {
   faBoxArchive,
   faShare,
   faMagnifyingGlass,
-  faTriangleExclamation
+  faTriangleExclamation,
+  faUser,
+  faChevronRight,
 } from '@fortawesome/free-solid-svg-icons';
 
 library.add(faFileImport);
@@ -105,6 +107,8 @@ library.add(faArrowsRotate);
 library.add(faArrowLeft);
 library.add(faAnglesRight);
 library.add(faAngleRight);
+library.add(faUser);
+library.add(faChevronRight);
 library.add(faCloudArrowDown);
 library.add(faCloudArrowUp);
 library.add(faHourglassHalf);

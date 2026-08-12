@@ -44,6 +44,9 @@ export default {
       dynamicImportFailedContent: 'Please refresh before continuing.',
       reloadNow: 'Refresh frontend',
       backHome: 'Back home',
+      updateAvailableTitle: 'Frontend update available',
+      updateAvailableContent: 'A new version is ready. Refresh to use it.',
+      updateLater: 'Later',
     },
     share: {
       title: 'Share',

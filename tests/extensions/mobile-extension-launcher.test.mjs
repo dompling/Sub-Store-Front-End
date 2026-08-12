@@ -32,6 +32,13 @@ test('opens apps normally and reserves details and uninstall for management mode
   assert.match(source, /@click="openDetails\(card\.id\)"/);
 });
 
+test('keeps compact management controls while enlarging their touch targets', async () => {
+  const source = await readSource('src/views/extensions/ExtensionStore.vue');
+
+  assert.match(source, /\.extension-app-remove::after,[\s\S]*\.extension-app-details::after/);
+  assert.match(source, /inset: -8px/);
+});
+
 test('uses the shared navbar for refresh, management and file-style search', async () => {
   const [source, navBar, router] = await Promise.all([
     readSource('src/views/extensions/ExtensionStore.vue'),
