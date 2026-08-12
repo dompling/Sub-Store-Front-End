@@ -106,6 +106,9 @@ export default {
     },
     "extensionStore": {
       "add": "Добавить расширение",
+      "settings": "Настройки расширений",
+      "sources": "Источники расширений",
+      "localInstall": "Установить локальное расширение",
       "manage": "Управление расширениями",
       "done": "Завершить управление",
       "searchPlaceholder": "Поиск по названию, описанию или автору"
@@ -125,6 +128,7 @@ export default {
       "archive": "Архив",
       "logs": "Логи бэкенда",
       "extensions": "Расширения",
+      "extensionDiscover": "Каталог расширений",
       "themeSetting": "Настройки темы",
       "moreSetting": "Дополнительные настройки",
       "apiSetting": "Управление бэкендом",

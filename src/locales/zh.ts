@@ -108,6 +108,9 @@ export default {
     },
     extensionStore: {
       add: '添加扩展',
+      settings: '扩展设置',
+      sources: '扩展订阅源',
+      localInstall: '本地安装扩展',
       manage: '管理扩展',
       done: '完成管理',
       searchPlaceholder: '搜索扩展名称、描述或发布者',
@@ -127,6 +130,7 @@ export default {
       archive: '已归档',
       logs: '后端日志',
       extensions: '扩展',
+      extensionDiscover: '发现扩展',
       themeSetting: '主题设置',
       moreSetting: '更多设置',
       apiSetting: '后端管理',

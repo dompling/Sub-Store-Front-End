@@ -1,6 +1,7 @@
 <template>
   <div class="extension-store-page">
     <input
+      v-if="extensionStore.supportsLocalPackageInstall"
       ref="localDirectoryInput"
       class="local-directory-input"
       type="file"
@@ -33,157 +34,163 @@
       </div>
     </section>
 
-    <div v-if="extensionStore.loading && !installedCards.length" class="store-state">
-      <span class="store-loading-spinner" aria-hidden="true" />
-      <span>{{ labels.loading }}</span>
-    </div>
-
-    <div v-else-if="!launcherCards.length" class="store-state store-state-empty">
-      <div class="store-empty-icon" aria-hidden="true">
-        <font-awesome-icon :icon="listSearchStore.hasQuery ? 'fa-solid fa-magnifying-glass' : 'fa-solid fa-puzzle-piece'" />
+    <template v-if="!isDiscoverPage">
+      <div v-if="extensionStore.loading && !installedCards.length" class="store-state">
+        <span class="store-loading-spinner" aria-hidden="true" />
+        <span>{{ labels.loading }}</span>
       </div>
-      <h3>{{ listSearchStore.hasQuery ? labels.empty : labels.noInstalled }}</h3>
-      <p>{{ listSearchStore.hasQuery ? labels.emptyDescription : labels.noInstalledDescription }}</p>
-    </div>
 
-    <Draggable
-      v-else
-      v-model="launcherCards"
-      item-key="id"
-      tag="section"
-      class="extension-app-grid"
-      :class="{ managing: appManagementMode, dragging: appDragging }"
-      :disabled="!appManagementMode"
-      ghost-class="extension-app-ghost"
-      chosen-class="extension-app-chosen"
-      drag-class="extension-app-drag"
-      :animation="180"
-      :force-fallback="true"
-      :fallback-on-body="true"
-      :fallback-tolerance="4"
-      :delay="0"
-      :touch-start-threshold="4"
-      @start="appDragging = true"
-      @end="appDragging = false"
-    >
-      <template #item="{ element: card }">
-        <article class="extension-app-item">
-          <div class="extension-app-icon-shell">
-            <button
-              type="button"
-              class="extension-app-launcher"
-              :class="{ unavailable: !canOpenExtension(card) }"
-              :aria-label="`${appManagementMode ? labels.details : labels.open} ${card.manifest?.name || card.name}`"
-              @click="openMobileExtension(card)"
-              @pointerdown="startAppLongPress(card)"
-              @pointerup="cancelAppLongPress"
-              @pointercancel="cancelAppLongPress"
-              @pointerleave="cancelAppLongPress"
-              @contextmenu.prevent="enterAppManagement(card)"
-            >
-              <span class="extension-app-icon" :class="{ image: isImageIcon(card.manifest?.icon) }">
-                <img v-if="isImageIcon(card.manifest?.icon)" :src="card.manifest?.icon as string" alt="" />
-                <font-awesome-icon v-else :icon="card.manifest?.icon || 'fa-solid fa-puzzle-piece'" />
-              </span>
-              <span
-                class="extension-app-status"
-                :class="statusTone(card.availability.status)"
-                :title="statusLabel(card.availability.status, card.availability.source, card.manifest?.kind)"
-              />
-            </button>
-
-            <div v-if="appManagementMode" class="extension-app-controls">
-              <button
-                v-if="canUninstall(card)"
-                type="button"
-                class="extension-app-remove"
-                :disabled="uninstallDisabled(card)"
-                :aria-label="`${labels.uninstall} ${card.manifest?.name || card.name}`"
-                :title="uninstallDisabled(card) ? managementHint(card) : labels.uninstall"
-                @click="confirmUninstall(card)"
-              >
-                <span aria-hidden="true">−</span>
-              </button>
-              <button
-                type="button"
-                class="extension-app-details"
-                :aria-label="`${labels.details} ${card.manifest?.name || card.name}`"
-                :title="labels.details"
-                @click="openDetails(card.id)"
-              >
-                <font-awesome-icon icon="fa-solid fa-circle-info" />
-              </button>
-            </div>
-          </div>
-          <span class="extension-app-title" :title="card.manifest?.name || card.name">
-            {{ card.manifest?.name || card.name }}
-          </span>
-        </article>
-      </template>
-    </Draggable>
-
-    <nut-popup
-      v-model:visible="addVisible"
-      :position="isMobileViewport ? 'bottom' : 'center'"
-      pop-class="extension-add-popup"
-      :style="{ width: isMobileViewport ? '100%' : 'min(560px, calc(100% - 48px))', maxHeight: isMobileViewport ? 'calc(100vh - 28px)' : 'min(720px, calc(100vh - 48px))' }"
-      :close-on-click-overlay="true"
-      :lock-scroll="true"
-      z-index="12000"
-    >
-      <div class="extension-add-panel">
-        <div class="source-panel-header">
-          <h2>{{ labels.addExtension }}</h2>
-          <button type="button" class="detail-close" :aria-label="labels.close" @click="addVisible = false">
-            <font-awesome-icon icon="fa-solid fa-xmark" />
-          </button>
+      <div v-else-if="!launcherCards.length" class="store-state store-state-empty">
+        <div class="store-empty-icon" aria-hidden="true">
+          <font-awesome-icon :icon="listSearchStore.hasQuery ? 'fa-solid fa-magnifying-glass' : 'fa-solid fa-puzzle-piece'" />
         </div>
+        <h3>{{ listSearchStore.hasQuery ? labels.empty : labels.noInstalled }}</h3>
+        <p>{{ listSearchStore.hasQuery ? labels.emptyDescription : labels.noInstalledDescription }}</p>
+      </div>
 
-        <div class="extension-add-scroll">
-          <div class="extension-add-shortcuts">
-            <button
-              v-if="extensionStore.supportsLocalPackageInstall"
-              type="button"
-              class="extension-add-shortcut"
-              :disabled="localInspecting || localInstalling"
-              @click="openLocalDirectoryFromAdd"
-            >
-              <font-awesome-icon icon="fa-solid fa-folder-open" />
-              <span>{{ labels.localInstall }}</span>
-            </button>
-            <button type="button" class="extension-add-shortcut" @click="openSourcesFromAdd">
-              <font-awesome-icon icon="fa-solid fa-link" />
-              <span>{{ labels.sourceSubscription }}</span>
-            </button>
-          </div>
-
-          <section v-if="availableCards.length" class="extension-add-available">
-            <h3>{{ labels.availableExtensions }}</h3>
-            <button
-              v-for="card in availableCards"
-              :key="card.id"
-              type="button"
-              class="extension-add-item"
-              @click="openAvailableExtension(card)"
-            >
-              <span class="extension-add-item-icon" :class="{ image: isImageIcon(card.manifest?.icon) }">
-                <img v-if="isImageIcon(card.manifest?.icon)" :src="card.manifest?.icon as string" alt="" />
-                <font-awesome-icon v-else :icon="card.manifest?.icon || 'fa-solid fa-puzzle-piece'" />
-              </span>
-              <span class="extension-add-item-copy">
-                <strong>{{ card.manifest?.name || card.name }}</strong>
-                <small class="extension-add-item-description">{{ card.manifest?.description || card.description || labels.noDescription }}</small>
-                <span class="extension-add-item-meta">
-                  <span><font-awesome-icon icon="fa-solid fa-user" /> {{ labels.author }}：{{ extensionPublisherLabel(card) }}</span>
-                  <span :title="extensionSourceLabel(card)"><font-awesome-icon icon="fa-solid fa-link" /> {{ labels.source }}：{{ extensionSourceLabel(card) }}</span>
+      <Draggable
+        v-else
+        v-model="launcherCards"
+        item-key="id"
+        tag="section"
+        class="extension-app-grid"
+        :class="{ managing: appManagementMode, dragging: appDragging }"
+        :disabled="!appManagementMode"
+        ghost-class="extension-app-ghost"
+        chosen-class="extension-app-chosen"
+        drag-class="extension-app-drag"
+        :animation="180"
+        :force-fallback="true"
+        :fallback-on-body="true"
+        :fallback-tolerance="4"
+        :delay="0"
+        :touch-start-threshold="4"
+        @start="appDragging = true"
+        @end="appDragging = false"
+      >
+        <template #item="{ element: card }">
+          <article class="extension-app-item">
+            <div class="extension-app-icon-shell">
+              <button
+                type="button"
+                class="extension-app-launcher"
+                :class="{ unavailable: !canOpenExtension(card) }"
+                :aria-label="launcherAriaLabel(card)"
+                @click="openMobileExtension(card)"
+                @pointerdown="startAppLongPress(card)"
+                @pointerup="cancelAppLongPress"
+                @pointercancel="cancelAppLongPress"
+                @pointerleave="cancelAppLongPress"
+                @contextmenu.prevent="enterAppManagement(card)"
+              >
+                <span class="extension-app-icon" :class="{ image: isImageIcon(card.manifest?.icon) }">
+                  <img v-if="isImageIcon(card.manifest?.icon)" :src="card.manifest?.icon as string" alt="" />
+                  <font-awesome-icon v-else :icon="card.manifest?.icon || 'fa-solid fa-puzzle-piece'" />
                 </span>
-              </span>
-              <span class="extension-add-item-action">{{ card.availability.status === 'reinstall-required' ? labels.reinstall : labels.install }}</span>
-            </button>
-          </section>
+                <span
+                  v-if="extensionPreferences.showUpdateBadges && canUpdate(card)"
+                  class="extension-app-update-badge"
+                  :title="updateBadgeTitle(card)"
+                  aria-hidden="true"
+                >
+                  <font-awesome-icon icon="fa-solid fa-arrow-rotate-right" />
+                </span>
+                <span
+                  v-if="extensionPreferences.showRuntimeStatus"
+                  class="extension-app-status"
+                  :class="statusTone(card.availability.status)"
+                  :title="statusLabel(card.availability.status, card.availability.source, card.manifest?.kind)"
+                />
+              </button>
+
+              <div v-if="appManagementMode" class="extension-app-controls">
+                <button
+                  v-if="canUninstall(card)"
+                  type="button"
+                  class="extension-app-remove"
+                  :disabled="uninstallDisabled(card)"
+                  :aria-label="`${labels.uninstall} ${card.manifest?.name || card.name}`"
+                  :title="uninstallDisabled(card) ? managementHint(card) : labels.uninstall"
+                  @click="confirmUninstall(card)"
+                >
+                  <span aria-hidden="true">−</span>
+                </button>
+                <button
+                  type="button"
+                  class="extension-app-details"
+                  :aria-label="`${labels.details} ${card.manifest?.name || card.name}`"
+                  :title="labels.details"
+                  @click="openDetails(card.id)"
+                >
+                  <font-awesome-icon icon="fa-solid fa-circle-info" />
+                </button>
+              </div>
+            </div>
+            <span class="extension-app-title" :title="card.manifest?.name || card.name">
+              {{ card.manifest?.name || card.name }}
+            </span>
+          </article>
+        </template>
+      </Draggable>
+    </template>
+
+    <section v-else class="extension-discover-page">
+      <header class="extension-discover-hero">
+        <div>
+          <span class="extension-discover-eyebrow">{{ labels.discover }}</span>
+          <h1>{{ labels.discoverTitle }}</h1>
+          <p>{{ labels.discoverDescription }}</p>
         </div>
+        <span class="extension-discover-count">{{ discoverCards.length }} {{ labels.extensionsCount }}</span>
+      </header>
+
+      <div v-if="extensionStore.loading && !allCards.length" class="store-state extension-discover-state">
+        <span class="store-loading-spinner" aria-hidden="true" />
+        <span>{{ labels.loading }}</span>
       </div>
-    </nut-popup>
+
+      <div v-else-if="!discoverCards.length" class="store-state store-state-empty extension-discover-state">
+        <div class="store-empty-icon" aria-hidden="true"><font-awesome-icon icon="fa-solid fa-magnifying-glass" /></div>
+        <h3>{{ labels.empty }}</h3>
+        <p>{{ labels.emptyDescription }}</p>
+      </div>
+
+      <div v-else class="extension-discover-list">
+        <article
+          v-for="card in discoverCards"
+          :key="card.id"
+          class="extension-discover-item"
+          @click="openDetails(card.id)"
+        >
+          <span class="extension-discover-icon" :class="{ image: isImageIcon(card.manifest?.icon) }">
+            <img v-if="isImageIcon(card.manifest?.icon)" :src="card.manifest?.icon as string" alt="" />
+            <font-awesome-icon v-else :icon="card.manifest?.icon || 'fa-solid fa-puzzle-piece'" />
+          </span>
+          <span class="extension-discover-copy">
+            <span class="extension-discover-title-row">
+              <strong>{{ card.manifest?.name || card.name }}</strong>
+              <span v-if="canUpdate(card)" class="extension-discover-update-dot">{{ labels.updateAvailable }}</span>
+            </span>
+            <small>{{ card.manifest?.description || card.description || labels.noDescription }}</small>
+            <span class="extension-discover-meta">
+              <span>{{ extensionPublisherLabel(card) }}</span>
+              <span :title="extensionSourceLabel(card)">{{ extensionSourceLabel(card) }}</span>
+              <span>v{{ availableVersion(card) || installedVersion(card) || '0.0.0' }}</span>
+            </span>
+          </span>
+          <button
+            type="button"
+            class="extension-discover-action"
+            :class="{ added: isInstalledCard(card) && !canUpdate(card), update: canUpdate(card) }"
+            :disabled="discoverCardActionDisabled(card)"
+            @click.stop="performDiscoverAction(card)"
+          >
+            <span v-if="isActionLoading(card.id)" class="button-spinner" />
+            <template v-else>{{ discoverCardActionLabel(card) }}</template>
+          </button>
+        </article>
+      </div>
+    </section>
 
     <nut-popup
       v-model:visible="detailVisible"
@@ -410,6 +417,58 @@
     </nut-popup>
 
     <nut-popup
+      v-model:visible="settingsVisible"
+      :position="isMobileViewport ? 'bottom' : 'center'"
+      pop-class="extension-settings-popup"
+      :style="{ width: isMobileViewport ? '100%' : 'min(520px, calc(100% - 48px))', maxHeight: isMobileViewport ? 'calc(100vh - 28px)' : 'min(680px, calc(100vh - 48px))' }"
+      :close-on-click-overlay="true"
+      :lock-scroll="true"
+      z-index="12000"
+    >
+      <div class="extension-settings-panel">
+        <div class="source-panel-header extension-settings-header">
+          <div>
+            <h2>{{ labels.extensionSettings }}</h2>
+            <p>{{ labels.extensionSettingsDescription }}</p>
+          </div>
+          <button type="button" class="detail-close" :aria-label="labels.close" @click="settingsVisible = false">
+            <font-awesome-icon icon="fa-solid fa-xmark" />
+          </button>
+        </div>
+
+        <div class="extension-settings-scroll">
+          <section class="extension-settings-group">
+            <h3>{{ labels.launcherSettings }}</h3>
+            <label class="extension-setting-row">
+              <span><strong>{{ labels.showUpdateBadges }}</strong><small>{{ labels.showUpdateBadgesDescription }}</small></span>
+              <nut-switch v-model="extensionPreferences.showUpdateBadges" size="mini" @change="saveExtensionPreferences" />
+            </label>
+            <label class="extension-setting-row">
+              <span><strong>{{ labels.showRuntimeStatus }}</strong><small>{{ labels.showRuntimeStatusDescription }}</small></span>
+              <nut-switch v-model="extensionPreferences.showRuntimeStatus" size="mini" @change="saveExtensionPreferences" />
+            </label>
+          </section>
+
+          <section class="extension-settings-group">
+            <h3>{{ labels.discoverySettings }}</h3>
+            <label class="extension-setting-row">
+              <span><strong>{{ labels.autoRefreshExtensions }}</strong><small>{{ labels.autoRefreshExtensionsDescription }}</small></span>
+              <nut-switch v-model="extensionPreferences.autoRefresh" size="mini" @change="saveExtensionPreferences" />
+            </label>
+            <label class="extension-setting-row">
+              <span><strong>{{ labels.prioritizeUpdates }}</strong><small>{{ labels.prioritizeUpdatesDescription }}</small></span>
+              <nut-switch v-model="extensionPreferences.prioritizeUpdates" size="mini" @change="saveExtensionPreferences" />
+            </label>
+          </section>
+
+          <button type="button" class="extension-settings-reset" @click="resetExtensionPreferences">
+            {{ labels.resetSettings }}
+          </button>
+        </div>
+      </div>
+    </nut-popup>
+
+    <nut-popup
       v-model:visible="sourcesVisible"
       :position="isMobileViewport ? 'bottom' : 'center'"
       pop-class="extension-sources-popup"
@@ -611,6 +670,7 @@ import { resolveExtensionOpenPath } from '@/extensions/frontend-catalog';
 import { useAppNotifyStore } from '@/store/appNotify';
 import { useListSearchStore } from '@/store/listSearch';
 import { useMethodStore } from '@/store/methodStore';
+import { useExtensionPreferencesStore } from '@/store/extensionPreferences';
 import { EXTENSION_STORE_COMMANDS } from '@/extensions/registry';
 import { Dialog } from '@nutui/nutui';
 import Draggable from 'vuedraggable';
@@ -645,11 +705,12 @@ const { locale } = useI18n();
 const extensionStore = useExtensionsStore();
 const listSearchStore = useListSearchStore();
 const methodStore = useMethodStore();
+const extensionPreferences = useExtensionPreferencesStore();
 const { catalog } = storeToRefs(extensionStore);
 const { showNotify } = useAppNotifyStore();
 
-const addVisible = ref(false);
 const detailVisible = ref(false);
+const settingsVisible = ref(false);
 const versionHistoryOpen = ref(false);
 const sourcesVisible = ref(false);
 const localInstallVisible = ref(false);
@@ -675,6 +736,7 @@ const appManagementMode = computed({
 const appPressTimer = ref<number | null>(null);
 const appLongPressResetTimer = ref<number | null>(null);
 const appLongPressTriggered = ref(false);
+const isDiscoverPage = computed(() => route.path === '/extensions/discover');
 
 const readLauncherOrder = (): string[] => {
   if (typeof window === 'undefined') return [];
@@ -732,8 +794,27 @@ const labels = computed(() => ({
   legacySource: isZh.value ? 'Sub-Store 兼容入口' : 'Sub-Store compatibility entry',
   officialCatalogSource: isZh.value ? 'Sub-Store 官方扩展目录' : 'Sub-Store official extension catalog',
   localInstallSource: isZh.value ? '本地文件夹安装' : 'Installed from a local folder',
+  discoverTitle: isZh.value ? '为 Sub-Store 添加新能力' : 'Add new capabilities to Sub-Store',
+  discoverDescription: isZh.value
+    ? '浏览扩展目录、查看版本和作者信息，也可以管理第三方订阅源或从本地安装。'
+    : 'Browse the catalog, review versions and publishers, manage third-party sources, or install locally.',
+  added: isZh.value ? '已添加' : 'Added',
+  extensionSettings: isZh.value ? '扩展设置' : 'Extension settings',
+  extensionSettingsDescription: isZh.value ? '这些偏好只保存在当前设备。' : 'These preferences are stored on this device only.',
+  launcherSettings: isZh.value ? '扩展桌面' : 'Extension launcher',
+  discoverySettings: isZh.value ? '发现与更新' : 'Discovery and updates',
+  showUpdateBadges: isZh.value ? '显示图标更新角标' : 'Show update icon badges',
+  showUpdateBadgesDescription: isZh.value ? '检测到新版本时，在扩展图标右上角显示更新提示。' : 'Show a badge on the extension icon when a newer version is available.',
+  showRuntimeStatus: isZh.value ? '显示运行状态圆点' : 'Show runtime status dots',
+  showRuntimeStatusDescription: isZh.value ? '在扩展图标右下角显示启用、异常或处理中状态。' : 'Show enabled, error, or working status at the bottom-right of each icon.',
+  autoRefreshExtensions: isZh.value ? '后台同步扩展状态' : 'Sync extension status in background',
+  autoRefreshExtensionsDescription: isZh.value ? '页面打开时正常读取数据，并在停留期间自动同步版本和运行状态。' : 'Load normally when opened and keep versions and runtime status synchronized while the page remains active.',
+  prioritizeUpdates: isZh.value ? '优先显示可更新扩展' : 'Prioritize available updates',
+  prioritizeUpdatesDescription: isZh.value ? '在发现页把有新版本的扩展排在前面，其余扩展保持目录原有顺序。' : 'Place extensions with updates first while preserving catalog order within each group.',
+  resetSettings: isZh.value ? '恢复默认设置' : 'Restore defaults',
   installedVersion: isZh.value ? '已安装版本' : 'Installed version',
   availableVersion: isZh.value ? '可用版本' : 'Available version',
+  updateAvailable: isZh.value ? '有可用更新' : 'Update available',
   rollbackVersions: isZh.value ? '可回滚版本' : 'Rollback versions',
   update: isZh.value ? '更新' : 'Update',
   rollback: isZh.value ? '回滚' : 'Roll back',
@@ -771,24 +852,34 @@ const isInstalledCard = (card: ExtensionCard) => {
 };
 
 const installedCards = computed(() => allCards.value.filter(isInstalledCard));
-const availableCards = computed(() => allCards.value.filter(card => !isInstalledCard(card)));
+const cardMatchesSearch = (card: ExtensionCard, normalizedQuery: string) => {
+  if (!normalizedQuery) return true;
+  return [
+    card.id,
+    card.name,
+    card.description,
+    card.manifest?.name,
+    card.manifest?.description,
+    card.manifest?.publisher?.name,
+    card.sourceName,
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase()
+    .includes(normalizedQuery);
+};
 const cards = computed(() => {
   const normalizedQuery = listSearchStore.normalizedQuery;
-  return installedCards.value.filter(card => {
-    if (!normalizedQuery) return true;
-    const haystack = [
-      card.id,
-      card.name,
-      card.description,
-      card.manifest?.name,
-      card.manifest?.description,
-      card.manifest?.publisher?.name,
-    ]
-      .filter(Boolean)
-      .join(' ')
-      .toLowerCase();
-    return haystack.includes(normalizedQuery);
-  });
+  return installedCards.value.filter(card => cardMatchesSearch(card, normalizedQuery));
+});
+
+const discoverCards = computed(() => {
+  const filtered = allCards.value.filter(card => cardMatchesSearch(card, listSearchStore.normalizedQuery));
+  if (!extensionPreferences.prioritizeUpdates) return filtered;
+  return filtered
+    .map((card, index) => ({ card, index }))
+    .sort((left, right) => Number(canUpdate(right.card)) - Number(canUpdate(left.card)) || left.index - right.index)
+    .map(({ card }) => card);
 });
 
 const sortedLauncherCards = computed(() => {
@@ -1205,6 +1296,35 @@ const canUpdate = (card: ExtensionCard) => card.updateAvailable === true
   && !sourceIsMissing(card)
   && card.availability.receipt?.installationStatus === 'installed';
 
+const updateBadgeTitle = (card: ExtensionCard) => {
+  const version = availableVersion(card);
+  return version ? `${labels.value.updateAvailable} · v${version}` : labels.value.updateAvailable;
+};
+
+const launcherAriaLabel = (card: ExtensionCard) => [
+  `${appManagementMode.value ? labels.value.details : labels.value.open} ${card.manifest?.name || card.name}`,
+  extensionPreferences.showUpdateBadges && canUpdate(card) ? labels.value.updateAvailable : '',
+].filter(Boolean).join(' · ');
+
+const discoverCardActionLabel = (card: ExtensionCard) => {
+  return isInstalledCard(card) ? labels.value.added : primaryActionLabel(card);
+};
+
+const discoverCardActionDisabled = (card: ExtensionCard) => {
+  if (isActionLoading(card.id)) return true;
+  if (isInstalledCard(card)) return false;
+  return isActionDisabled(card);
+};
+
+const performDiscoverAction = async (card: ExtensionCard) => {
+  if (isActionLoading(card.id)) return;
+  if (isInstalledCard(card)) {
+    openDetails(card.id);
+    return;
+  }
+  await performPrimaryAction(card);
+};
+
 const canRollback = (card: ExtensionCard) => (
   card.rollbackAvailable === true
   || card.availability.receipt?.rollbackAvailable === true
@@ -1297,22 +1417,22 @@ const clearAdminToken = () => {
 const openAddExtensions = () => {
   extensionStore.lastActionError = '';
   listSearchStore.close();
-  addVisible.value = true;
+  router.push('/extensions/discover');
 };
 
-const openLocalDirectoryFromAdd = () => {
-  addVisible.value = false;
-  openLocalDirectoryPicker();
+const openExtensionSettings = () => {
+  settingsVisible.value = true;
 };
 
-const openSourcesFromAdd = () => {
-  addVisible.value = false;
-  openSources();
+const saveExtensionPreferences = () => {
+  extensionPreferences.save();
+  if (extensionPreferences.autoRefresh) extensionStore.startRevisionSync();
+  else extensionStore.stopRevisionSync();
 };
 
-const openAvailableExtension = (card: ExtensionCard) => {
-  addVisible.value = false;
-  openDetails(card.id);
+const resetExtensionPreferences = () => {
+  extensionPreferences.reset();
+  extensionStore.startRevisionSync();
 };
 
 const openLocalDirectoryPicker = () => {
@@ -1644,8 +1764,20 @@ onMounted(() => {
     EXTENSION_STORE_COMMANDS.toggleManagement,
     toggleAppManagement,
   );
+  methodStore.registerMethod(
+    EXTENSION_STORE_COMMANDS.settings,
+    openExtensionSettings,
+  );
+  methodStore.registerMethod(
+    EXTENSION_STORE_COMMANDS.sources,
+    openSources,
+  );
+  methodStore.registerMethod(
+    EXTENSION_STORE_COMMANDS.localInstall,
+    openLocalDirectoryPicker,
+  );
   extensionStore.refresh({ silent: true });
-  extensionStore.startRevisionSync();
+  if (extensionPreferences.autoRefresh) extensionStore.startRevisionSync();
   window.addEventListener('resize', handleResize);
   if (typeof route.query.id === 'string') openDetails(route.query.id);
 });
@@ -1653,6 +1785,9 @@ onMounted(() => {
 onBeforeUnmount(() => {
   methodStore.removeMethod(EXTENSION_STORE_COMMANDS.add);
   methodStore.removeMethod(EXTENSION_STORE_COMMANDS.toggleManagement);
+  methodStore.removeMethod(EXTENSION_STORE_COMMANDS.settings);
+  methodStore.removeMethod(EXTENSION_STORE_COMMANDS.sources);
+  methodStore.removeMethod(EXTENSION_STORE_COMMANDS.localInstall);
   extensionStore.setLauncherManagementMode(false);
   window.removeEventListener('resize', handleResize);
   cancelAppLongPress();
@@ -1879,6 +2014,27 @@ onBeforeUnmount(() => {
 .extension-app-status.warning { background: var(--warning-color, #d88900); }
 .extension-app-status.muted { background: var(--lowest-text-color); }
 
+.extension-app-update-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  z-index: 1;
+  display: inline-flex;
+  width: 22px;
+  height: 22px;
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--background-color);
+  border-radius: 50%;
+  color: #fff;
+  background: var(--primary-color);
+  box-shadow: 0 2px 7px color-mix(in srgb, var(--primary-text-color) 18%, transparent);
+  font-size: 9px;
+  line-height: 1;
+  transition: opacity 0.15s ease, visibility 0.15s ease;
+}
+
 .extension-app-controls {
   position: absolute;
   inset: 0;
@@ -1963,6 +2119,11 @@ onBeforeUnmount(() => {
 .extension-app-grid.managing .extension-app-launcher {
   cursor: grab;
   touch-action: none;
+}
+
+.extension-app-grid.managing .extension-app-update-badge {
+  visibility: hidden;
+  opacity: 0;
 }
 
 .extension-app-grid.dragging .extension-app-icon-shell,
@@ -2165,162 +2326,185 @@ onBeforeUnmount(() => {
   line-height: 1.55;
 }
 
-.extension-add-panel {
+.extension-discover-page {
+  width: min(920px, 100%);
+  margin: 0 auto;
+}
+
+.extension-discover-hero {
   display: flex;
-  width: 100%;
-  max-height: inherit;
-  flex-direction: column;
-  overflow: hidden;
-  color: var(--second-text-color);
-  background: var(--popup-color);
+  min-width: 0;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 18px 4px 20px;
 }
 
-.extension-add-scroll {
-  min-height: 0;
-  flex: 1 1 auto;
-  overflow-y: auto;
-  padding: 16px 20px calc(20px + var(--safe-area-bottom, 0px));
-  overscroll-behavior: contain;
-}
-
-.extension-add-shortcuts {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.extension-add-shortcut {
-  display: inline-flex;
-  min-height: 36px;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  border: 1px solid var(--divider-color);
-  border-radius: 9px;
-  padding: 0 12px;
-  color: var(--primary-text-color);
-  background: var(--card-color);
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.extension-add-shortcut:hover,
-.extension-add-shortcut:focus-visible {
-  border-color: color-mix(in srgb, var(--primary-color) 42%, var(--divider-color));
-}
-
-.extension-add-shortcut:disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
-}
-
-.extension-add-shortcut > svg {
+.extension-discover-eyebrow {
   color: var(--primary-color);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
-.extension-add-available {
-  margin-top: 20px;
-}
-
-.extension-add-available > h3 {
-  margin: 0 0 8px;
+.extension-discover-hero h1 {
+  max-width: 100%;
+  margin: 4px 0 0;
   color: var(--primary-text-color);
-  font-size: 13px;
+  font-size: clamp(22px, 4vw, 32px);
+  line-height: 1.12;
+  overflow-wrap: anywhere;
 }
 
-.extension-add-item {
+.extension-discover-hero p {
+  max-width: 620px;
+  margin: 8px 0 0;
+  color: var(--comment-text-color);
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.extension-discover-count {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  padding: 6px 10px;
+  color: var(--comment-text-color);
+  background: var(--card-color);
+  font-size: 10px;
+}
+
+.extension-discover-list {
+  overflow: hidden;
+  border: 1px solid var(--divider-color);
+  border-radius: 16px;
+  background: var(--card-color);
+}
+
+.extension-discover-item {
   display: grid;
   width: 100%;
   min-width: 0;
-  grid-template-columns: 46px minmax(0, 1fr) auto;
+  box-sizing: border-box;
+  grid-template-columns: 64px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 10px;
-  border: 0;
+  gap: 14px;
   border-bottom: 1px solid var(--divider-color);
-  padding: 11px 0;
+  padding: 14px 16px;
   color: var(--comment-text-color);
-  background: transparent;
-  text-align: left;
   cursor: pointer;
 }
 
-.extension-add-item:last-of-type {
+.extension-discover-item:last-child {
   border-bottom: 0;
 }
 
-.extension-add-item-icon {
+.extension-discover-icon {
   display: inline-flex;
-  width: 46px;
-  height: 46px;
+  width: 64px;
+  height: 64px;
   box-sizing: border-box;
   align-items: center;
   justify-content: center;
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--divider-color) 72%, transparent);
-  border-radius: 13px;
+  border-radius: 17px;
   color: var(--primary-color);
   background: linear-gradient(145deg, color-mix(in srgb, var(--primary-color) 14%, var(--card-color)), var(--card-color));
-  font-size: 19px;
+  box-shadow: 0 5px 14px color-mix(in srgb, var(--primary-text-color) 8%, transparent);
+  font-size: 25px;
 }
 
-.extension-add-item-icon.image img {
+.extension-discover-icon.image img {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-.extension-add-item-copy {
+.extension-discover-copy {
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: 3px;
+  gap: 4px;
 }
 
-.extension-add-item-copy > strong {
+.extension-discover-title-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+}
+
+.extension-discover-title-row > strong {
   overflow: hidden;
   color: var(--primary-text-color);
-  font-size: 12px;
+  font-size: 14px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.extension-add-item-description {
+.extension-discover-copy > small {
   display: -webkit-box;
   overflow: hidden;
   color: var(--comment-text-color);
-  font-size: 10px;
-  line-height: 1.4;
+  font-size: 11px;
+  line-height: 1.45;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
 
-.extension-add-item-meta {
+.extension-discover-meta {
   display: flex;
   min-width: 0;
   flex-wrap: wrap;
-  gap: 3px 10px;
+  gap: 3px 9px;
   color: var(--lowest-text-color);
-  font-size: 9px;
+  font-size: 10px;
   line-height: 1.35;
 }
 
-.extension-add-item-meta > span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.extension-add-item-action {
+.extension-discover-update-dot {
   flex: 0 0 auto;
   border-radius: 999px;
-  padding: 5px 9px;
+  padding: 2px 6px;
   color: var(--primary-color);
   background: color-mix(in srgb, var(--primary-color) 10%, transparent);
-  font-size: 10px;
+  font-size: 9px;
+  font-weight: 600;
+}
+
+.extension-discover-action {
+  min-width: 64px;
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 999px;
+  padding: 7px 12px;
+  color: var(--primary-color);
+  background: color-mix(in srgb, var(--primary-color) 10%, transparent);
+  font-size: 11px;
   font-weight: 600;
   white-space: nowrap;
+  cursor: pointer;
+}
+
+.extension-discover-action.added {
+  color: var(--comment-text-color);
+  background: var(--background-color);
+}
+
+.extension-discover-action.update {
+  color: #fff;
+  background: var(--primary-color);
+}
+
+.extension-discover-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.extension-discover-state {
+  min-height: 260px;
 }
 
 .extension-detail {
@@ -2331,6 +2515,92 @@ onBeforeUnmount(() => {
   overflow: hidden;
   color: var(--second-text-color);
   background: var(--popup-color);
+}
+
+.extension-settings-panel {
+  display: flex;
+  width: 100%;
+  max-height: inherit;
+  flex-direction: column;
+  overflow: hidden;
+  color: var(--second-text-color);
+  background: var(--popup-color);
+}
+
+.extension-settings-header p {
+  margin: 4px 0 0;
+  color: var(--comment-text-color);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.extension-settings-scroll {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 16px 20px calc(20px + var(--safe-area-bottom, 0px));
+  overscroll-behavior: contain;
+}
+
+.extension-settings-group {
+  overflow: hidden;
+  margin-bottom: 16px;
+  border: 1px solid var(--divider-color);
+  border-radius: 13px;
+  background: var(--card-color);
+}
+
+.extension-settings-group > h3 {
+  margin: 0;
+  padding: 10px 12px 8px;
+  color: var(--lowest-text-color);
+  background: var(--background-color);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.extension-setting-row {
+  display: flex;
+  min-height: 58px;
+  align-items: center;
+  gap: 14px;
+  border-bottom: 1px solid var(--divider-color);
+  padding: 9px 12px;
+}
+
+.extension-setting-row:last-child {
+  border-bottom: 0;
+}
+
+.extension-setting-row > span {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.extension-setting-row strong {
+  color: var(--primary-text-color);
+  font-size: 12px;
+}
+
+.extension-setting-row small {
+  color: var(--comment-text-color);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.extension-settings-reset {
+  width: 100%;
+  border: 1px solid var(--divider-color);
+  border-radius: 10px;
+  padding: 9px 12px;
+  color: var(--primary-color);
+  background: var(--card-color);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
 }
 
 .detail-header {
@@ -2953,7 +3223,7 @@ onBeforeUnmount(() => {
 /* NutUI applies the popup class to the fixed shell. Keep the shell itself
  * from becoming a second scroll container; the inner panes own scrolling. */
 :global(.extension-detail-popup),
-:global(.extension-add-popup),
+:global(.extension-settings-popup),
 :global(.extension-sources-popup),
 :global(.extension-local-popup) {
   overflow: hidden !important;
@@ -2962,7 +3232,7 @@ onBeforeUnmount(() => {
 }
 
 :global(.extension-sources-popup.popup-bottom),
-:global(.extension-add-popup.popup-bottom),
+:global(.extension-settings-popup.popup-bottom),
 :global(.extension-detail-popup.popup-bottom),
 :global(.extension-local-popup.popup-bottom) {
   border-radius: var(--item-card-radios) var(--item-card-radios) 0 0 !important;
@@ -2992,7 +3262,6 @@ onBeforeUnmount(() => {
   .source-form-actions > button { flex: 1 1 0; }
   .detail-actions { flex-wrap: wrap; }
   .detail-actions .detail-uninstall-button { margin-right: 0; }
-  .extension-add-shortcut { flex: 1 1 0; }
 }
 
 @media screen and (max-width: 599px) {
@@ -3008,22 +3277,75 @@ onBeforeUnmount(() => {
     padding: 12px 2px 24px;
   }
 
-  .extension-add-scroll {
-    padding-right: 16px;
-    padding-left: 16px;
+  .extension-discover-hero {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+    padding-top: 12px;
   }
 
-  .extension-add-item {
-    grid-template-columns: 44px minmax(0, 1fr) auto;
+  .extension-discover-hero > div {
+    min-width: 0;
+    max-width: 100%;
   }
 
-  .extension-add-item-icon {
-    width: 44px;
-    height: 44px;
+  .extension-discover-hero h1 {
+    font-size: 23px;
+    line-height: 1.18;
+  }
+
+  .extension-discover-hero p {
+    font-size: 11px;
+    line-height: 1.55;
+  }
+
+  .extension-discover-list {
+    margin-right: calc(var(--safe-area-side) * -1);
+    margin-left: calc(var(--safe-area-side) * -1);
+    border-right: 0;
+    border-left: 0;
+    border-radius: 0;
+  }
+
+  .extension-discover-item {
+    grid-template-columns: 56px minmax(0, 1fr) auto;
+    gap: 11px;
+    padding: 12px var(--safe-area-side);
+  }
+
+  .extension-discover-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 15px;
+  }
+
+  .extension-discover-copy > small {
+    -webkit-line-clamp: 1;
+  }
+
+  .extension-discover-meta > span:nth-child(2) {
+    display: none;
+  }
+
+  .extension-discover-action {
+    min-width: 58px;
+    padding-right: 10px;
+    padding-left: 10px;
   }
 }
 
 @media screen and (max-width: 420px) {
+  .extension-discover-item {
+    grid-template-columns: 52px minmax(0, 1fr) auto;
+    gap: 9px;
+  }
+  .extension-discover-icon {
+    width: 52px;
+    height: 52px;
+    border-radius: 14px;
+  }
+  .extension-discover-title-row > strong { font-size: 12px; }
+  .extension-discover-update-dot { display: none; }
   .detail-facts { grid-template-columns: minmax(0, 1fr); }
   .release-item {
     align-items: stretch;

@@ -108,6 +108,9 @@ export default {
     },
     extensionStore: {
       add: "Add extension",
+      settings: "Extension settings",
+      sources: "Extension sources",
+      localInstall: "Install local extension",
       manage: "Manage extensions",
       done: "Finish managing",
       searchPlaceholder: "Search extension name, description, or publisher",
@@ -127,6 +130,7 @@ export default {
       archive: "Archived",
       logs: "Backend Logs",
       extensions: "Extensions",
+      extensionDiscover: "Discover Extensions",
       themeSetting: "Theme Setting",
       moreSetting: "More Setting",
       apiSetting: "Backend Management",

@@ -19,6 +19,9 @@ export const NAVIGATION_IDS = {
 
 export const EXTENSION_STORE_COMMANDS = {
   add: 'extensions.store.add',
+  settings: 'extensions.store.settings',
+  sources: 'extensions.store.sources',
+  localInstall: 'extensions.store.local-install',
   toggleManagement: 'extensions.store.toggle-management',
 } as const;
 

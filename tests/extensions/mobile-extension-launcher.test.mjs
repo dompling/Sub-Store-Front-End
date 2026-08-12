@@ -39,6 +39,19 @@ test('keeps compact management controls while enlarging their touch targets', as
   assert.match(source, /inset: -8px/);
 });
 
+test('marks launcher icons when an installed extension has an available update', async () => {
+  const source = await readSource('src/views/extensions/ExtensionStore.vue');
+  const template = source.slice(0, source.indexOf('<script setup'));
+
+  assert.match(template, /:aria-label="launcherAriaLabel\(card\)"/);
+  assert.match(template, /v-if="extensionPreferences\.showUpdateBadges && canUpdate\(card\)"[\s\S]*class="extension-app-update-badge"/);
+  assert.match(template, /v-if="extensionPreferences\.showRuntimeStatus"[\s\S]*class="extension-app-status"/);
+  assert.match(source, /updateAvailable:\s*isZh\.value \? '有可用更新' : 'Update available'/);
+  assert.match(source, /const launcherAriaLabel = \(card: ExtensionCard\)/);
+  assert.match(source, /\.extension-app-update-badge\s*\{/);
+  assert.match(source, /\.extension-app-grid\.managing \.extension-app-update-badge/);
+});
+
 test('uses the shared navbar for refresh, management and file-style search', async () => {
   const [source, navBar, router] = await Promise.all([
     readSource('src/views/extensions/ExtensionStore.vue'),
@@ -58,31 +71,21 @@ test('uses the shared navbar for refresh, management and file-style search', asy
   assert.doesNotMatch(template, /class="store-manage-button"/);
 });
 
-test('keeps the launcher clean and moves installation and sources behind the navbar add action', async () => {
-  const source = await readSource('src/views/extensions/ExtensionStore.vue');
+test('keeps the launcher clean and opens a dedicated extension discovery page', async () => {
+  const [source, router] = await Promise.all([
+    readSource('src/views/extensions/ExtensionStore.vue'),
+    readSource('src/router/index.ts'),
+  ]);
   const template = source.slice(0, source.indexOf('<script setup'));
 
   assert.doesNotMatch(template, /class="store-header"|class="store-toolbar"/);
   assert.match(source, /EXTENSION_STORE_COMMANDS\.add/);
-  assert.match(source, /const availableCards = computed\(/);
+  assert.match(source, /router\.push\('\/extensions\/discover'\)/);
   assert.match(source, /const isInstalledCard = \(card: ExtensionCard\)/);
   assert.match(source, /allCards\.value\.filter\(isInstalledCard\)/);
-  assert.match(template, /class="extension-add-popup"/);
-  assert.match(template, /openLocalDirectoryFromAdd/);
-  assert.match(template, /openSourcesFromAdd/);
-  const addPopup = template.slice(
-    template.indexOf('v-model:visible="addVisible"'),
-    template.indexOf('v-model:visible="detailVisible"'),
-  );
-  const addShortcuts = addPopup.slice(
-    addPopup.indexOf('class="extension-add-shortcuts"'),
-    addPopup.indexOf('class="extension-add-available"'),
-  );
-  assert.doesNotMatch(addShortcuts, /addExtensionDescription|localInstallDescription|sourcesDescription|<small/);
-  assert.match(addShortcuts, /labels\.localInstall/);
-  assert.match(addShortcuts, /labels\.sourceSubscription/);
-  assert.match(addPopup, /<section v-if="availableCards\.length" class="extension-add-available">/);
-  assert.doesNotMatch(addPopup, /extension-add-empty/);
+  assert.match(router, /path:\s*['"]\/extensions\/discover['"]/);
+  assert.match(template, /class="extension-discover-page"/);
+  assert.doesNotMatch(template, /class="extension-add-popup"/);
 });
 
 test('reorders installed extensions with a persistent iOS-style draggable launcher', async () => {

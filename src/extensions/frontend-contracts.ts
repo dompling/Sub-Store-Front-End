@@ -21,6 +21,7 @@ export interface FrontendExtensionRouteMeta extends RouteMeta {
   supportsListViewMode?: boolean;
   supportsListSearch?: boolean;
   listSearchPlaceholderKey?: string;
+  hideNavTitle?: boolean;
   hideSideBarInWideScreenNarrowMode?: boolean;
   extensionId: string;
   extensionSurfaceId: string;
@@ -30,6 +31,12 @@ export interface FrontendExtensionRouteMeta extends RouteMeta {
     importCommand?: string;
     importLabelKey?: string;
     manageCommand?: string;
+    settingsCommand?: string;
+    settingsLabelKey?: string;
+    sourcesCommand?: string;
+    sourcesLabelKey?: string;
+    localInstallCommand?: string;
+    localInstallLabelKey?: string;
   };
 }
 

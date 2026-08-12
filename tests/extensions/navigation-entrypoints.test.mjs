@@ -90,6 +90,9 @@ test('places plugin list actions after the back button hit area', async () => {
 
   assert.match(layout, /if \(isNeedBack\.value\)/);
   assert.match(layout, /if \(showAddButton\.value\) \{\s*buttons\.push\("add"\)/);
+  assert.match(layout, /if \(showSettingsButton\.value\) \{\s*buttons\.push\("settings"\)/);
+  assert.match(layout, /if \(showSourcesButton\.value\) \{\s*buttons\.push\("sources"\)/);
+  assert.match(layout, /if \(showLocalInstallButton\.value\) \{\s*buttons\.push\("localInstall"\)/);
   assert.match(layout, /if \(showImportButton\.value\) \{\s*buttons\.push\("import"\)/);
   assert.match(layout, /if \(showSearchButton\.value\) \{\s*buttons\.push\("search"\)/);
   assert.match(layout, /acc\[key\] = `\$\{42 \+ index \* 30\}px`/);

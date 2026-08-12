@@ -86,6 +86,7 @@ declare module 'vue-router' {
     supportsListViewMode?: boolean;
     supportsListSearch?: boolean;
     listSearchPlaceholderKey?: string;
+    hideNavTitle?: boolean;
     hideSideBarInWideScreenNarrowMode?: boolean;
     extensionId?: string;
     extensionSurfaceId?: string;
@@ -95,6 +96,12 @@ declare module 'vue-router' {
       importCommand?: string;
       importLabelKey?: string;
       manageCommand?: string;
+      settingsCommand?: string;
+      settingsLabelKey?: string;
+      sourcesCommand?: string;
+      sourcesLabelKey?: string;
+      localInstallCommand?: string;
+      localInstallLabelKey?: string;
     };
     dynamicExtensionRoute?: boolean;
   }
@@ -241,6 +248,28 @@ const router = createRouter({
               addCommand: EXTENSION_STORE_COMMANDS.add,
               addLabelKey: 'navBar.extensionStore.add',
               manageCommand: EXTENSION_STORE_COMMANDS.toggleManagement,
+            },
+            hideSideBarInWideScreenNarrowMode: true,
+          },
+        },
+        {
+          path: '/extensions/discover',
+          component: () => import('@/views/extensions/ExtensionStore.vue'),
+          meta: {
+            title: 'extensionDiscover',
+            needTabBar: false,
+            needNavBack: true,
+            backPath: '/extensions',
+            supportsListSearch: true,
+            listSearchPlaceholderKey: 'navBar.extensionStore.searchPlaceholder',
+            hideNavTitle: true,
+            pageActions: {
+              settingsCommand: EXTENSION_STORE_COMMANDS.settings,
+              settingsLabelKey: 'navBar.extensionStore.settings',
+              sourcesCommand: EXTENSION_STORE_COMMANDS.sources,
+              sourcesLabelKey: 'navBar.extensionStore.sources',
+              localInstallCommand: EXTENSION_STORE_COMMANDS.localInstall,
+              localInstallLabelKey: 'navBar.extensionStore.localInstall',
             },
             hideSideBarInWideScreenNarrowMode: true,
           },

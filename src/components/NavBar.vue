@@ -71,6 +71,48 @@
               />
             </button>
             <button
+              v-if="showSettingsButton"
+              type="button"
+              @click.stop="invokePageAction('settingsCommand')"
+              class="navBar-left-icon navBar-left-icon--settings"
+              :style="{ left: navLeftButtonLeft.settings }"
+              :aria-label="pageActions.settingsLabelKey ? t(pageActions.settingsLabelKey) : undefined"
+              :title="pageActions.settingsLabelKey ? t(pageActions.settingsLabelKey) : undefined"
+            >
+              <font-awesome-icon
+                class="icon"
+                icon="fa-solid fa-gear"
+              />
+            </button>
+            <button
+              v-if="showSourcesButton"
+              type="button"
+              @click.stop="invokePageAction('sourcesCommand')"
+              class="navBar-left-icon navBar-left-icon--sources"
+              :style="{ left: navLeftButtonLeft.sources }"
+              :aria-label="pageActions.sourcesLabelKey ? t(pageActions.sourcesLabelKey) : undefined"
+              :title="pageActions.sourcesLabelKey ? t(pageActions.sourcesLabelKey) : undefined"
+            >
+              <font-awesome-icon
+                class="icon"
+                icon="fa-solid fa-link"
+              />
+            </button>
+            <button
+              v-if="showLocalInstallButton"
+              type="button"
+              @click.stop="invokePageAction('localInstallCommand')"
+              class="navBar-left-icon navBar-left-icon--local-install"
+              :style="{ left: navLeftButtonLeft.localInstall }"
+              :aria-label="pageActions.localInstallLabelKey ? t(pageActions.localInstallLabelKey) : undefined"
+              :title="pageActions.localInstallLabelKey ? t(pageActions.localInstallLabelKey) : undefined"
+            >
+              <font-awesome-icon
+                class="icon"
+                icon="fa-solid fa-folder-open"
+              />
+            </button>
+            <button
               v-if="showImportButton"
               type="button"
               @click.stop="invokePageAction('importCommand')"
@@ -285,7 +327,7 @@ const currentTitle = computed(() => {
     return t("navBar.pagesTitle.logs");
   }
 
-  if (isListSearchActive.value) {
+  if (isListSearchActive.value || route.meta.hideNavTitle) {
     return "";
   }
 
@@ -293,7 +335,7 @@ const currentTitle = computed(() => {
   return metaTitle ? t(`navBar.pagesTitle.${metaTitle}`) : undefined;
 });
 const currentTitleWhetherAsk = computed(() => {
-  if (isLogsOverlayOpen.value || isListSearchActive.value) return "";
+  if (isLogsOverlayOpen.value || isListSearchActive.value || route.meta.hideNavTitle) return "";
 
   const ownAsk = ["sync"];
   const metaTitle = route.meta.title;
@@ -325,6 +367,12 @@ const showAddButton = computed(() => {
 });
 const showImportButton = computed(() => Boolean(pageActions.value.importCommand));
 const showManageButton = computed(() => Boolean(pageActions.value.manageCommand));
+const showSettingsButton = computed(() => Boolean(pageActions.value.settingsCommand));
+const showSourcesButton = computed(() => Boolean(pageActions.value.sourcesCommand));
+const showLocalInstallButton = computed(() => (
+  Boolean(pageActions.value.localInstallCommand)
+  && extensionsStore.supportsLocalPackageInstall
+));
 const showSearchButton = computed(() => {
   return Boolean(route.meta.supportsListSearch)
     && !isLogsOverlayOpen.value
@@ -380,6 +428,15 @@ const navLeftButtonLeft = computed<Record<string, string>>(() => {
     if (showManageButton.value) {
       buttons.push("manage");
     }
+    if (showSettingsButton.value) {
+      buttons.push("settings");
+    }
+    if (showSourcesButton.value) {
+      buttons.push("sources");
+    }
+    if (showLocalInstallButton.value) {
+      buttons.push("localInstall");
+    }
     if (showImportButton.value) {
       buttons.push("import");
     }
@@ -402,6 +459,15 @@ const navLeftButtonLeft = computed<Record<string, string>>(() => {
   }
   if (showManageButton.value) {
     buttons.push("manage");
+  }
+  if (showSettingsButton.value) {
+    buttons.push("settings");
+  }
+  if (showSourcesButton.value) {
+    buttons.push("sources");
+  }
+  if (showLocalInstallButton.value) {
+    buttons.push("localInstall");
   }
   if (showSearchButton.value) {
     buttons.push("search");
@@ -461,7 +527,15 @@ const onClickNavbarIcon = () => {
     });
 };
 
-const invokePageAction = (key: 'addCommand' | 'importCommand' | 'manageCommand') => {
+const invokePageAction = (
+  key:
+    | 'addCommand'
+    | 'importCommand'
+    | 'manageCommand'
+    | 'settingsCommand'
+    | 'sourcesCommand'
+    | 'localInstallCommand',
+) => {
   const command = pageActions.value[key];
   if (command) methodStore.invokeMethod(command, {});
 };
@@ -710,6 +784,9 @@ const refresh = async () => {
         .navBar-left-icon--refresh,
         .navBar-left-icon--manage,
         .navBar-left-icon--add,
+        .navBar-left-icon--settings,
+        .navBar-left-icon--sources,
+        .navBar-left-icon--local-install,
         .navBar-left-icon--import,
         .navBar-left-icon--search {
           left: 7px;
