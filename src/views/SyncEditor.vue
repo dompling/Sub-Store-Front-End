@@ -221,10 +221,14 @@
         <template
           v-if="
             sourceInput &&
-            ['subscription', 'collection'].includes(form.type)
+            (['subscription', 'collection'].includes(form.type) ||
+              artifactPlatformOptions.length > 0)
           "
         >
-          <nut-form-item class="include-unsupported-proxy-wrapper">
+          <nut-form-item
+            v-if="['subscription', 'collection'].includes(form.type)"
+            class="include-unsupported-proxy-wrapper"
+          >
             <template #label>
               <div class="label" @click="includeUnsupportedProxyTips">
                 <p>{{ $t(`syncPage.addArtForm.includeUnsupportedProxy.label`) }}</p>
@@ -236,7 +240,10 @@
             </div>
           </nut-form-item>
 
-          <nut-form-item :label="$t(`syncPage.addArtForm.prettyYaml.label`)">
+          <nut-form-item
+            v-if="['subscription', 'collection'].includes(form.type)"
+            :label="$t(`syncPage.addArtForm.prettyYaml.label`)"
+          >
             <div class="switch-wrapper">
               <nut-switch v-model="form.prettyYaml" />
             </div>
@@ -248,31 +255,25 @@
               v-model="form.platform"
               class="artifact-radio-group"
             >
-              <nut-radio label="Stash">Stash</nut-radio>
-              <nut-radio label="Egern">Egern</nut-radio>
-              <nut-radio label="ClashMeta">mihomo</nut-radio>
-              <nut-radio label="Surfboard">Surfboard</nut-radio>
-              <nut-radio label="Surge">Surge</nut-radio>
-              <nut-radio label="SurgeMac">
-                Surge Mac
+              <nut-radio
+                v-for="platform in artifactPlatformOptions"
+                :key="platform"
+                :label="platform"
+              >
+                {{ artifactPlatformLabel(platform) }}
                 <a
+                  v-if="platform === 'SurgeMac'"
                   href="https://github.com/sub-store-org/Sub-Store/wiki/%E9%93%BE%E6%8E%A5%E5%8F%82%E6%95%B0%E8%AF%B4%E6%98%8E"
                   target="_blank"
                 >
                   ⓘ
                 </a>
+                <span
+                  v-if="platform === 'QX'"
+                  name="tips"
+                  @click="qxTips"
+                >&nbsp;ⓘ</span>
               </nut-radio>
-              <nut-radio label="Loon">Loon</nut-radio>
-              <nut-radio label="ShadowRocket">Shadowrocket</nut-radio>
-              <nut-radio label="QX">
-                Quantumult X
-                <span name="tips" @click="qxTips">&nbsp;ⓘ</span>
-              </nut-radio>
-              <nut-radio label="sing-box">sing-box</nut-radio>
-              <nut-radio label="V2Ray">V2Ray</nut-radio>
-              <nut-radio label="URI">URI</nut-radio>
-              <nut-radio label="JSON">JSON</nut-radio>
-              <nut-radio label="Clash">Clash(Deprecated)</nut-radio>
             </nut-radiogroup>
           </nut-form-item>
         </template>
@@ -333,6 +334,11 @@ import { useBackend } from "@/hooks/useBackend";
 import type { ExtensionArtifactSourceDescriptor } from "@/extensions/contracts";
 import { resolveArtifactIcon } from "@/utils/artifactIcon";
 import {
+  artifactSourcePlatforms,
+  findArtifactSourceDescriptor,
+  resolveArtifactSourcePlatform,
+} from "@/utils/artifactSourcePlatforms";
+import {
   getEditorActiveTab,
   setEditorActiveTab,
 } from "@/utils/editorTabState";
@@ -378,6 +384,22 @@ const { bottomSafeArea } = storeToRefs(globalStore);
 const { navBarHeight } = storeToRefs(systemStore);
 const { appearanceSetting, githubProxy, githubProxyRegex } = storeToRefs(settingsStore);
 const extensionArtifactSources = ref<ExtensionArtifactSourceDescriptor[]>([]);
+const BUILTIN_ARTIFACT_PLATFORMS = [
+  "Stash",
+  "Egern",
+  "ClashMeta",
+  "Surfboard",
+  "Surge",
+  "SurgeMac",
+  "Loon",
+  "ShadowRocket",
+  "QX",
+  "sing-box",
+  "V2Ray",
+  "URI",
+  "JSON",
+  "Clash",
+];
 
 const padding = bottomSafeArea.value + "px";
 const routeConfigName = computed(() => route.params.id as string);
@@ -578,6 +600,34 @@ const sourceOptions = computed(() => {
   return options;
 });
 
+const currentExtensionArtifactSource = computed(() =>
+  findArtifactSourceDescriptor(extensionArtifactSources.value, form.type),
+);
+const artifactPlatformOptions = computed(() => {
+  const extensionPlatforms = artifactSourcePlatforms(
+    currentExtensionArtifactSource.value,
+  );
+  return extensionPlatforms.length
+    ? extensionPlatforms
+    : ['subscription', 'collection'].includes(form.type)
+      ? BUILTIN_ARTIFACT_PLATFORMS
+      : [];
+});
+const artifactPlatformLabel = (platform: string) => ({
+  Clash: "Clash(Deprecated)",
+  ClashMeta: "mihomo",
+  QX: "Quantumult X",
+  ShadowRocket: "Shadowrocket",
+  SurgeMac: "Surge Mac",
+}[platform] || platform);
+const normalizeSelectedArtifactPlatform = () => {
+  form.platform = resolveArtifactSourcePlatform({
+    sources: extensionArtifactSources.value,
+    type: form.type,
+    platform: form.platform,
+  });
+};
+
 const displayType = computed(() => {
   return (
     sourceOptions.value.find(item => item.value === form.type)?.text ??
@@ -606,6 +656,7 @@ const updateSourceInput = () => {
 const sourceChange = (value: string[]) => {
   form.type = value[0];
   form.source = value[1];
+  normalizeSelectedArtifactPlatform();
   updateSourceInput();
 };
 
@@ -657,8 +708,9 @@ watchEffect(() => {
 });
 
 watch(
-  [sourceOptions, () => form.type, () => form.source],
+  [sourceOptions, () => form.type, () => form.source, extensionArtifactSources],
   () => {
+    normalizeSelectedArtifactPlatform();
     updateSourceInput();
   },
   { deep: true }
