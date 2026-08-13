@@ -88,19 +88,24 @@
                   <font-awesome-icon v-else :icon="card.manifest?.icon || 'fa-solid fa-puzzle-piece'" />
                 </span>
                 <span
-                  v-if="extensionPreferences.showUpdateBadges && canUpdate(card)"
-                  class="extension-app-update-badge"
-                  :title="updateBadgeTitle(card)"
-                  aria-hidden="true"
-                >
-                  <font-awesome-icon icon="fa-solid fa-arrow-rotate-right" />
-                </span>
-                <span
                   v-if="extensionPreferences.showRuntimeStatus"
                   class="extension-app-status"
                   :class="statusTone(card.availability.status)"
                   :title="statusLabel(card.availability.status, card.availability.source, card.manifest?.kind)"
                 />
+              </button>
+
+              <button
+                v-if="extensionPreferences.showUpdateBadges && canUpdate(card)"
+                type="button"
+                class="extension-app-update-badge"
+                :aria-label="updateBadgeAriaLabel(card)"
+                :title="updateBadgeTitle(card)"
+                @click.stop="openDetails(card.id)"
+                @pointerdown.stop
+                @contextmenu.stop.prevent
+              >
+                <font-awesome-icon icon="fa-solid fa-arrow-rotate-right" />
               </button>
 
               <div v-if="appManagementMode" class="extension-app-controls">
@@ -160,28 +165,38 @@
           v-for="card in discoverCards"
           :key="card.id"
           class="extension-discover-item"
-          @click="openDetails(card.id)"
         >
-          <span class="extension-discover-icon" :class="{ image: isImageIcon(card.manifest?.icon) }">
-            <img v-if="isImageIcon(card.manifest?.icon)" :src="card.manifest?.icon as string" alt="" />
-            <font-awesome-icon v-else :icon="card.manifest?.icon || 'fa-solid fa-puzzle-piece'" />
-          </span>
-          <span class="extension-discover-copy">
-            <span class="extension-discover-title-row">
-              <strong>{{ card.manifest?.name || card.name }}</strong>
-              <span v-if="canUpdate(card)" class="extension-discover-update-dot">{{ labels.updateAvailable }}</span>
+          <button
+            type="button"
+            class="extension-discover-details"
+            :aria-label="detailActionLabel(card)"
+            @click="openDetails(card.id)"
+          >
+            <span class="extension-discover-icon" :class="{ image: isImageIcon(card.manifest?.icon) }">
+              <img v-if="isImageIcon(card.manifest?.icon)" :src="card.manifest?.icon as string" alt="" />
+              <font-awesome-icon v-else :icon="card.manifest?.icon || 'fa-solid fa-puzzle-piece'" />
             </span>
-            <small>{{ card.manifest?.description || card.description || labels.noDescription }}</small>
-            <span class="extension-discover-meta">
-              <span>{{ extensionPublisherLabel(card) }}</span>
-              <span :title="extensionSourceLabel(card)">{{ extensionSourceLabel(card) }}</span>
-              <span>v{{ availableVersion(card) || installedVersion(card) || '0.0.0' }}</span>
+            <span class="extension-discover-copy">
+              <span class="extension-discover-title-row">
+                <strong>{{ card.manifest?.name || card.name }}</strong>
+                <span v-if="canUpdate(card)" class="extension-discover-update-dot">{{ labels.updateAvailable }}</span>
+              </span>
+              <small>{{ card.manifest?.description || card.description || labels.noDescription }}</small>
+              <span class="extension-discover-meta">
+                <span>{{ extensionPublisherLabel(card) }}</span>
+                <span :title="extensionSourceLabel(card)">{{ extensionSourceLabel(card) }}</span>
+                <span>v{{ availableVersion(card) || installedVersion(card) || '0.0.0' }}</span>
+              </span>
             </span>
-          </span>
+          </button>
           <button
             type="button"
             class="extension-discover-action"
-            :class="{ added: isInstalledCard(card) && !canUpdate(card), update: canUpdate(card) }"
+            :class="{
+              added: isInstalledCard(card) && !canUpdate(card) && !canOpenExtension(card),
+              open: canOpenExtension(card) && !canUpdate(card),
+              update: canUpdate(card),
+            }"
             :disabled="discoverCardActionDisabled(card)"
             @click.stop="performDiscoverAction(card)"
           >
@@ -230,6 +245,9 @@
               <div><dt>{{ labels.author }}</dt><dd>{{ extensionPublisherLabel(selectedCard) }}</dd></div>
               <div><dt>{{ labels.source }}</dt><dd :title="extensionSourceLabel(selectedCard)">{{ extensionSourceLabel(selectedCard) }}</dd></div>
             </dl>
+            <p v-if="isThirdPartyPlugin(selectedCard)" class="detail-trust-note">
+              {{ labels.thirdPartyTrustNotice }}
+            </p>
           </div>
 
           <div v-if="selectedCard.manifest?.capabilities?.length" class="detail-section">
@@ -373,45 +391,54 @@
         </div>
 
         <div class="detail-actions">
-          <button
-            v-if="canUninstall(selectedCard)"
-            type="button"
-            class="details-button detail-uninstall-button"
-            :disabled="uninstallDisabled(selectedCard)"
-            :title="uninstallDisabled(selectedCard) ? managementHint(selectedCard) : labels.uninstall"
-            @click="confirmUninstall(selectedCard)"
-          >
-            {{ labels.uninstall }}
-          </button>
-          <button
-            v-if="canUpdate(selectedCard)"
-            type="button"
-            class="details-button version-update-button"
-            :disabled="isActionLoading(selectedCard.id) || !extensionStore.canManage"
-            @click="performVersionAction(selectedCard, 'update')"
-          >
-            {{ labels.update }}
-          </button>
-          <button type="button" class="details-button" @click="detailVisible = false">{{ labels.close }}</button>
-          <button
-            v-if="canOpenExtension(selectedCard) && canDisable(selectedCard.id)"
-            type="button"
-            class="details-button"
-            @click="openExtension(selectedCard)"
-          >
-            {{ labels.open }}
-          </button>
-          <button
-            v-if="hasPrimaryAction(selectedCard)"
-            type="button"
-            class="primary-action"
-            :class="{ danger: canDisable(selectedCard.id) }"
-            :disabled="isActionLoading(selectedCard.id) || isActionDisabled(selectedCard)"
-            @click="performPrimaryAction(selectedCard)"
-          >
-            <span v-if="isActionLoading(selectedCard.id)" class="button-spinner" />
-            <template v-else>{{ primaryActionLabel(selectedCard) }}</template>
-          </button>
+          <div v-if="canUninstall(selectedCard)" class="detail-actions-management">
+            <button
+              type="button"
+              class="details-button detail-uninstall-button"
+              :disabled="uninstallDisabled(selectedCard)"
+              :title="uninstallDisabled(selectedCard) ? managementHint(selectedCard) : labels.uninstall"
+              @click="confirmUninstall(selectedCard)"
+            >
+              {{ labels.uninstall }}
+            </button>
+          </div>
+          <div class="detail-actions-main">
+            <div class="detail-actions-secondary">
+              <button
+                v-if="canOpenExtension(selectedCard) && canDisable(selectedCard.id)"
+                type="button"
+                class="details-button detail-open-button"
+                @click="openExtension(selectedCard)"
+              >
+                <font-awesome-icon icon="fa-solid fa-arrow-up-right-from-square" />
+                {{ labels.open }}
+              </button>
+              <button
+                v-if="hasPrimaryAction(selectedCard)"
+                type="button"
+                class="primary-action"
+                :class="{ 'detail-state-button': canDisable(selectedCard.id) }"
+                :disabled="isActionLoading(selectedCard.id) || isActionDisabled(selectedCard)"
+                @click="performPrimaryAction(selectedCard)"
+              >
+                <span v-if="isActionLoading(selectedCard.id)" class="button-spinner" />
+                <template v-else>{{ primaryActionLabel(selectedCard) }}</template>
+              </button>
+            </div>
+            <button
+              v-if="canUpdate(selectedCard)"
+              type="button"
+              class="primary-action detail-update-button"
+              :disabled="isActionLoading(selectedCard.id) || !extensionStore.canManage"
+              @click="performVersionAction(selectedCard, 'update')"
+            >
+              <span v-if="isActionLoading(selectedCard.id)" class="button-spinner" />
+              <template v-else>
+                <font-awesome-icon icon="fa-solid fa-arrow-rotate-right" />
+                {{ labels.update }}
+              </template>
+            </button>
+          </div>
         </div>
       </div>
     </nut-popup>
@@ -598,6 +625,7 @@
 
         <div class="detail-scroll">
           <p class="detail-description">{{ labels.localInstallDescription }}</p>
+          <p class="detail-trust-note local-install-trust-note">{{ labels.localTrustNotice }}</p>
 
           <div class="detail-section detail-status-section">
             <h3>{{ labels.localPackage }}</h3>
@@ -648,7 +676,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
@@ -754,9 +782,9 @@ const launcherOrder = ref<string[]>(readLauncherOrder());
 
 const isZh = computed(() => String(locale.value || '').toLowerCase().startsWith('zh'));
 const labelsBase = computed(() => isZh.value ? {
-  title: '扩展', subtitle: '按需安装和管理 Sub-Store 功能', refresh: '刷新扩展列表', search: '搜索扩展', clear: '清除搜索', discover: '发现', installed: '已安装', loading: '正在读取扩展状态…', empty: '没有匹配的扩展', emptyDescription: '可以清除搜索条件，或稍后重试。', compatibility: '当前后端尚未提供扩展清单，已保留兼容模式。', discoveryFailed: '暂时无法读取扩展运行状态。已保持最后一次可信状态，未将插件自动恢复为兼容模式。', retry: '重新读取', details: '详情', noDescription: '暂无描述', capabilities: '能力', permissions: '权限', runtimeStatus: '运行状态', status: '状态', runtime: '运行实现', variant: '运行变体', codeStatus: '代码状态', revision: '后端版本', generation: '数据代次', manifestDigest: '清单摘要', packageDigest: '包摘要', data: '数据', close: '关闭', save: '保存', adminToken: '管理凭据', adminTokenDescription: '安装、启用、停用和卸载需要管理员控制面令牌。令牌只保存在当前页面内存中。', adminTokenPlaceholder: '输入管理令牌', adminRequiredAction: '填写管理凭据', install: '安装', enable: '启用', disable: '停用', open: '打开', reinstall: '重新安装', uninstall: '卸载', uninstallTitle: '卸载扩展？', uninstallDescription: '扩展代码和安装记录会被移除，配置数据默认保留，可在之后重新安装恢复。', unavailable: '需要后端支持', legacy: '兼容模式', bundled: '内置', embedded: '内置运行实现', nodePackage: 'Node 已验证安装包', contentPackage: '已校验内容包', managed: '已安装', pending: '处理中', incompatible: '不兼容', missing: '未安装', retainedUser: '数据已保留', retainedBackup: '数据已恢复，需重新安装', installSuccess: '扩展安装任务已提交', actionSuccess: '扩展状态已更新', actionFailed: '扩展操作失败', controlReadOnly: '当前后端为只读模式', clearToken: '清除凭据', tasks: '安装任务', sources: '来源', sourcesDescription: '添加可信的第三方扩展目录；支持 GitHub 文件、Raw/Release 链接和 HTTPS JSON 地址。', sourceUrl: '来源 URL', sourceUrlPlaceholder: 'https://github.com/… 或 https://example.com/catalog.json', sourceName: '来源名称', sourceNamePlaceholder: '例如：我的扩展仓库', optional: '可选', sourceUrlInvalid: '外部来源必须使用 HTTPS；HTTP 仅支持本机地址。', sourceHelp: 'Sub-Store 会校验目录、包摘要和文件完整性，防止下载内容漂移；Node 可执行扩展会在后端进程中运行，请只添加你信任的来源。', sourceAdminTokenDescription: '添加、刷新或删除来源前，请输入管理令牌。', sourceRemoved: '扩展来源已移除', sourceRemovedDescription: '已安装内容仍可查看和卸载；如需重新安装，请先重新添加原来源。', sourceUnavailable: '来源已移除', addSource: '添加来源', refreshSources: '重新读取', refreshSource: '刷新来源', removeSource: '删除来源', sourcesEmpty: '还没有第三方来源', extensionsCount: '个扩展', sourceStatusActive: '正常', sourceStatusRefreshing: '刷新中', sourceStatusFailed: '异常', sourceStatusDisabled: '已停用', sourceStatusUnknown: '未知', managementNoToken: '当前后端需要管理令牌。请先在此处填写管理凭据。', managementReadOnly: '当前后端处于只读模式，暂时不能执行管理操作。', localInstall: '本地安装', localInstallDescription: '选择由扩展发布工具生成、同时包含 manifest.json、receipt.json 和 package.json 的完整扩展包文件夹。', localChecking: '正在检查…', localChecked: '检查通过', localConfirm: '确认安装', localPackage: '扩展包', localFolder: '文件夹', localFiles: '文件数', localSize: '文件大小', localVersion: '版本', localPublisher: '发布者', localWarnings: '检查警告', localDiagnostics: '检查信息', localInvalid: '无法读取该扩展文件夹', localAdminRequired: '本地安装需要管理凭据，请先填写管理令牌。',
+  title: '插件', subtitle: '按需安装和管理 Sub-Store 功能', refresh: '刷新插件列表', search: '搜索插件', clear: '清除搜索', discover: '发现', installed: '已安装', loading: '正在读取插件状态…', empty: '没有匹配的插件', emptyDescription: '可以清除搜索条件，或稍后重试。', compatibility: '当前后端尚未提供插件清单，已保留兼容模式。', discoveryFailed: '暂时无法读取插件运行状态。已保持最后一次可信状态，未将插件自动恢复为兼容模式。', retry: '重新读取', details: '详情', noDescription: '暂无描述', capabilities: '能力', permissions: '权限', runtimeStatus: '运行状态', status: '状态', runtime: '运行实现', variant: '运行变体', codeStatus: '代码状态', revision: '后端版本', generation: '数据代次', manifestDigest: '清单摘要', packageDigest: '包摘要', data: '数据', close: '关闭', save: '保存', adminToken: '管理凭据', adminTokenDescription: '安装、启用、停用和卸载需要管理员控制面令牌。令牌只保存在当前页面内存中。', adminTokenPlaceholder: '输入管理令牌', adminRequiredAction: '填写管理凭据', install: '安装', enable: '启用', disable: '停用', open: '打开', reinstall: '重新安装', uninstall: '卸载', uninstallTitle: '卸载插件？', uninstallDescription: '插件代码和安装记录会被移除，配置数据默认保留，可在之后重新安装恢复。', unavailable: '需要后端支持', legacy: '兼容模式', bundled: '内置', embedded: '内置运行实现', nodePackage: 'Node 已验证插件包', contentPackage: '已校验内容包', managed: '已安装', pending: '处理中', incompatible: '不兼容', missing: '未安装', retainedUser: '数据已保留', retainedBackup: '数据已恢复，需重新安装', installSuccess: '插件安装任务已提交', actionSuccess: '插件状态已更新', actionFailed: '插件操作失败', controlReadOnly: '当前后端为只读模式', clearToken: '清除凭据', tasks: '安装任务', sources: '来源', sourcesDescription: '添加可信的第三方插件目录；支持 GitHub 文件、Raw/Release 链接和 HTTPS JSON 地址。', sourceUrl: '来源 URL', sourceUrlPlaceholder: 'https://github.com/… 或 https://example.com/catalog.json', sourceName: '来源名称', sourceNamePlaceholder: '例如：我的插件仓库', optional: '可选', sourceUrlInvalid: '外部来源必须使用 HTTPS；HTTP 仅支持本机地址。', sourceHelp: 'Sub-Store 会校验目录、包摘要和文件完整性，防止下载内容漂移；Node 可执行插件会在后端进程中运行，请只添加你信任的来源。', sourceAdminTokenDescription: '添加、刷新或删除来源前，请输入管理令牌。', sourceRemoved: '插件来源已移除', sourceRemovedDescription: '已安装内容仍可查看和卸载；如需重新安装，请先重新添加原来源。', sourceUnavailable: '来源已移除', addSource: '添加来源', refreshSources: '重新读取', refreshSource: '刷新来源', removeSource: '删除来源', sourcesEmpty: '还没有第三方来源', extensionsCount: '个插件', sourceStatusActive: '正常', sourceStatusRefreshing: '刷新中', sourceStatusFailed: '异常', sourceStatusDisabled: '已停用', sourceStatusUnknown: '未知', managementNoToken: '当前后端需要管理令牌。请先在此处填写管理凭据。', managementReadOnly: '当前后端处于只读模式，暂时不能执行管理操作。', localInstall: '本地安装', localInstallDescription: '选择由插件发布工具生成、同时包含 manifest.json、receipt.json 和 package.json 的完整插件包文件夹。', localChecking: '正在检查…', localChecked: '检查通过', localConfirm: '确认安装', localPackage: '插件包', localFolder: '文件夹', localFiles: '文件数', localSize: '文件大小', localVersion: '版本', localPublisher: '发布者', localWarnings: '检查警告', localDiagnostics: '检查信息', localInvalid: '无法读取该插件文件夹', localAdminRequired: '本地安装需要管理凭据，请先填写管理令牌。',
 } : {
-  title: 'Extensions', subtitle: 'Install and manage Sub-Store features', refresh: 'Refresh extensions', search: 'Search extensions', clear: 'Clear search', discover: 'Discover', installed: 'Installed', loading: 'Loading extension status…', empty: 'No matching extensions', emptyDescription: 'Clear the search or try again later.', compatibility: 'This backend does not expose the extension manifest yet; compatibility mode is active.', discoveryFailed: 'Extension runtime status is temporarily unavailable. The last trusted state is retained and compatibility mode was not reopened.', retry: 'Retry', details: 'Details', noDescription: 'No description', capabilities: 'Capabilities', permissions: 'Permissions', runtimeStatus: 'Runtime status', status: 'Status', runtime: 'Implementation', variant: 'Variant', codeStatus: 'Code status', revision: 'Backend revision', generation: 'Data generation', manifestDigest: 'Manifest digest', packageDigest: 'Package digest', data: 'Data', close: 'Close', save: 'Save', adminToken: 'Admin credential', adminTokenDescription: 'Install, enable, disable, and uninstall actions require an administrator token. It remains in this page memory only.', adminTokenPlaceholder: 'Enter admin token', adminRequiredAction: 'Enter credential', install: 'Install', enable: 'Enable', disable: 'Disable', open: 'Open', reinstall: 'Reinstall', uninstall: 'Uninstall', uninstallTitle: 'Uninstall extension?', uninstallDescription: 'Extension code and its receipt will be removed. Data remains available for a later reinstall by default.', unavailable: 'Backend support required', legacy: 'Compatibility mode', bundled: 'Bundled', embedded: 'Embedded implementation', nodePackage: 'Verified Node package', contentPackage: 'Verified content package', managed: 'Installed', pending: 'Working', incompatible: 'Incompatible', missing: 'Not installed', retainedUser: 'Data retained', retainedBackup: 'Data restored; reinstall required', installSuccess: 'Extension install task submitted', actionSuccess: 'Extension state updated', actionFailed: 'Extension action failed', controlReadOnly: 'This backend is read-only', clearToken: 'Clear credential', tasks: 'Install tasks', sources: 'Sources', sourcesDescription: 'Add trusted third-party extension catalogs. GitHub files, Raw/Release links, and HTTPS JSON URLs are supported.', sourceUrl: 'Source URL', sourceUrlPlaceholder: 'https://github.com/… or https://example.com/catalog.json', sourceName: 'Source name', sourceNamePlaceholder: 'For example: My extension catalog', optional: 'optional', sourceUrlInvalid: 'External sources must use HTTPS; HTTP is limited to loopback hosts.', sourceHelp: 'Sub-Store verifies the catalog, package digest, and every file so downloaded content cannot drift unnoticed. Executable Node extensions run inside the backend process, so add only sources you trust.', sourceAdminTokenDescription: 'Enter the admin token before adding, refreshing, or removing a source.', sourceRemoved: 'Extension source removed', sourceRemovedDescription: 'Installed content remains inspectable and uninstallable. Add the original source again before reinstalling.', sourceUnavailable: 'Source removed', addSource: 'Add source', refreshSources: 'Reload list', refreshSource: 'Refresh source', removeSource: 'Remove source', sourcesEmpty: 'No third-party sources yet', extensionsCount: 'extensions', sourceStatusActive: 'Ready', sourceStatusRefreshing: 'Refreshing', sourceStatusFailed: 'Failed', sourceStatusDisabled: 'Disabled', sourceStatusUnknown: 'Unknown', managementNoToken: 'This backend requires an admin token. Enter the management credential above first.', managementReadOnly: 'This backend is read-only, so management actions are unavailable.', localInstall: 'Local install', localInstallDescription: 'Choose a complete package folder generated by the extension release tooling. It must contain manifest.json, receipt.json, and package.json.', localChecking: 'Checking…', localChecked: 'Checked', localConfirm: 'Confirm install', localPackage: 'Extension package', localFolder: 'Folder', localFiles: 'Files', localSize: 'Package size', localVersion: 'Version', localPublisher: 'Publisher', localWarnings: 'Inspection warnings', localDiagnostics: 'Inspection details', localInvalid: 'Unable to read this extension folder', localAdminRequired: 'Local installation requires an admin credential. Enter the management token first.',
+  title: 'Plugins', subtitle: 'Install and manage Sub-Store features', refresh: 'Refresh plugins', search: 'Search plugins', clear: 'Clear search', discover: 'Discover', installed: 'Installed', loading: 'Loading plugin status…', empty: 'No matching plugins', emptyDescription: 'Clear the search or try again later.', compatibility: 'This backend does not expose the plugin manifest yet; compatibility mode is active.', discoveryFailed: 'Plugin runtime status is temporarily unavailable. The last trusted state is retained and compatibility mode was not reopened.', retry: 'Retry', details: 'Details', noDescription: 'No description', capabilities: 'Capabilities', permissions: 'Permissions', runtimeStatus: 'Runtime status', status: 'Status', runtime: 'Implementation', variant: 'Variant', codeStatus: 'Code status', revision: 'Backend revision', generation: 'Data generation', manifestDigest: 'Manifest digest', packageDigest: 'Package digest', data: 'Data', close: 'Close', save: 'Save', adminToken: 'Admin credential', adminTokenDescription: 'Install, enable, disable, and uninstall actions require an administrator token. It remains in this page memory only.', adminTokenPlaceholder: 'Enter admin token', adminRequiredAction: 'Enter credential', install: 'Install', enable: 'Enable', disable: 'Disable', open: 'Open', reinstall: 'Reinstall', uninstall: 'Uninstall', uninstallTitle: 'Uninstall plugin?', uninstallDescription: 'Plugin code and its receipt will be removed. Data remains available for a later reinstall by default.', unavailable: 'Backend support required', legacy: 'Compatibility mode', bundled: 'Bundled', embedded: 'Embedded implementation', nodePackage: 'Verified Node plugin', contentPackage: 'Verified content package', managed: 'Installed', pending: 'Working', incompatible: 'Incompatible', missing: 'Not installed', retainedUser: 'Data retained', retainedBackup: 'Data restored; reinstall required', installSuccess: 'Plugin install task submitted', actionSuccess: 'Plugin state updated', actionFailed: 'Plugin action failed', controlReadOnly: 'This backend is read-only', clearToken: 'Clear credential', tasks: 'Install tasks', sources: 'Sources', sourcesDescription: 'Add trusted third-party plugin catalogs. GitHub files, Raw/Release links, and HTTPS JSON URLs are supported.', sourceUrl: 'Source URL', sourceUrlPlaceholder: 'https://github.com/… or https://example.com/catalog.json', sourceName: 'Source name', sourceNamePlaceholder: 'For example: My plugin catalog', optional: 'optional', sourceUrlInvalid: 'External sources must use HTTPS; HTTP is limited to loopback hosts.', sourceHelp: 'Sub-Store verifies the catalog, package digest, and every file so downloaded content cannot drift unnoticed. Executable Node plugins run inside the backend process, so add only sources you trust.', sourceAdminTokenDescription: 'Enter the admin token before adding, refreshing, or removing a source.', sourceRemoved: 'Plugin source removed', sourceRemovedDescription: 'Installed content remains inspectable and uninstallable. Add the original source again before reinstalling.', sourceUnavailable: 'Source removed', addSource: 'Add source', refreshSources: 'Reload list', refreshSource: 'Refresh source', removeSource: 'Remove source', sourcesEmpty: 'No third-party sources yet', extensionsCount: 'plugins', sourceStatusActive: 'Ready', sourceStatusRefreshing: 'Refreshing', sourceStatusFailed: 'Failed', sourceStatusDisabled: 'Disabled', sourceStatusUnknown: 'Unknown', managementNoToken: 'This backend requires an admin token. Enter the management credential above first.', managementReadOnly: 'This backend is read-only, so management actions are unavailable.', localInstall: 'Local install', localInstallDescription: 'Choose a complete plugin folder generated by the plugin release tooling. It must contain manifest.json, receipt.json, and package.json.', localChecking: 'Checking…', localChecked: 'Checked', localConfirm: 'Confirm install', localPackage: 'Plugin package', localFolder: 'Folder', localFiles: 'Files', localSize: 'Package size', localVersion: 'Version', localPublisher: 'Publisher', localWarnings: 'Inspection warnings', localDiagnostics: 'Inspection details', localInvalid: 'Unable to read this plugin folder', localAdminRequired: 'Local installation requires an admin credential. Enter the admin token first.',
 });
 
 const labels = computed(() => ({
@@ -765,26 +793,26 @@ const labels = computed(() => ({
   done: isZh.value ? '完成' : 'Done',
   adminToken: isZh.value ? '管理令牌' : 'Admin token',
   adminTokenDescription: isZh.value
-    ? '这是 Sub-Store 后端的管理令牌，不是插件密码。它用于阻止其他网页或局域网设备擅自安装、停用和删除扩展；只保存在当前页面内存中，刷新后会清除。'
-    : 'This is the Sub-Store backend management token, not a plugin password. It prevents other websites or LAN devices from installing, disabling, or deleting extensions. It stays in page memory and is cleared on refresh.',
+    ? '这是 Sub-Store 后端的管理令牌，不是插件密码。它用于阻止其他网页或局域网设备擅自安装、停用和删除插件；只保存在当前页面内存中，刷新后会清除。'
+    : 'This is the Sub-Store backend management token, not a plugin password. It prevents other websites or LAN devices from installing, disabling, or deleting plugins. It stays in page memory and is cleared on refresh.',
   adminRequiredAction: isZh.value ? '填写管理令牌' : 'Enter admin token',
   clearToken: isZh.value ? '清除令牌' : 'Clear token',
   sourceAdminTokenDescription: isZh.value
-    ? '添加、刷新或删除扩展来源属于后端管理操作，需要使用同一个管理令牌。'
-    : 'Adding, refreshing, or removing extension sources is a backend management action and uses the same admin token.',
+    ? '添加、刷新或删除插件来源属于后端管理操作，需要使用同一个管理令牌。'
+    : 'Adding, refreshing, or removing plugin sources is a backend management action and uses the same admin token.',
   managementNoToken: isZh.value
     ? '当前后端需要管理令牌。请先在详情中填写同一个后端管理令牌。'
     : 'This backend requires its admin token. Enter the same backend management token in Details first.',
   localAdminRequired: isZh.value
     ? '本地安装属于后端管理操作，请先填写管理令牌。'
     : 'Local installation is a backend management action. Enter the admin token first.',
-  addExtension: isZh.value ? '添加扩展' : 'Add extensions',
+  addExtension: isZh.value ? '添加插件' : 'Add plugins',
   sourceSubscription: isZh.value ? '订阅源' : 'Sources',
-  availableExtensions: isZh.value ? '可安装的扩展' : 'Available extensions',
-  noInstalled: isZh.value ? '还没有安装扩展' : 'No extensions installed',
+  availableExtensions: isZh.value ? '可安装的插件' : 'Available plugins',
+  noInstalled: isZh.value ? '还没有安装插件' : 'No plugins installed',
   noInstalledDescription: isZh.value
-    ? '使用左上角的 + 安装扩展或添加扩展来源。'
-    : 'Use the + button in the top-left corner to install an extension or add a source.',
+    ? '使用左上角的 + 安装插件或添加插件来源。'
+    : 'Use the + button in the top-left corner to install a plugin or add a source.',
   author: isZh.value ? '作者' : 'Author',
   source: isZh.value ? '来源' : 'Source',
   provenance: isZh.value ? '来源信息' : 'Provenance',
@@ -792,25 +820,25 @@ const labels = computed(() => ({
   unknownSource: isZh.value ? '未声明' : 'Unspecified',
   bundledSource: isZh.value ? 'Sub-Store 内置' : 'Bundled with Sub-Store',
   legacySource: isZh.value ? 'Sub-Store 兼容入口' : 'Sub-Store compatibility entry',
-  officialCatalogSource: isZh.value ? 'Sub-Store 官方扩展目录' : 'Sub-Store official extension catalog',
+  officialCatalogSource: isZh.value ? 'Sub-Store 官方插件目录' : 'Sub-Store official plugin catalog',
   localInstallSource: isZh.value ? '本地文件夹安装' : 'Installed from a local folder',
   discoverTitle: isZh.value ? '为 Sub-Store 添加新能力' : 'Add new capabilities to Sub-Store',
   discoverDescription: isZh.value
-    ? '浏览扩展目录、查看版本和作者信息，也可以管理第三方订阅源或从本地安装。'
+    ? '浏览插件目录、查看版本和作者信息，也可以管理第三方订阅源或从本地安装。'
     : 'Browse the catalog, review versions and publishers, manage third-party sources, or install locally.',
   added: isZh.value ? '已添加' : 'Added',
-  extensionSettings: isZh.value ? '扩展设置' : 'Extension settings',
+  extensionSettings: isZh.value ? '插件设置' : 'Plugin settings',
   extensionSettingsDescription: isZh.value ? '这些偏好只保存在当前设备。' : 'These preferences are stored on this device only.',
-  launcherSettings: isZh.value ? '扩展桌面' : 'Extension launcher',
+  launcherSettings: isZh.value ? '插件桌面' : 'Plugin launcher',
   discoverySettings: isZh.value ? '发现与更新' : 'Discovery and updates',
   showUpdateBadges: isZh.value ? '显示图标更新角标' : 'Show update icon badges',
-  showUpdateBadgesDescription: isZh.value ? '检测到新版本时，在扩展图标右上角显示更新提示。' : 'Show a badge on the extension icon when a newer version is available.',
+  showUpdateBadgesDescription: isZh.value ? '检测到新版本时，在插件图标右上角显示更新提示。' : 'Show a badge on the plugin icon when a newer version is available.',
   showRuntimeStatus: isZh.value ? '显示运行状态圆点' : 'Show runtime status dots',
-  showRuntimeStatusDescription: isZh.value ? '在扩展图标右下角显示启用、异常或处理中状态。' : 'Show enabled, error, or working status at the bottom-right of each icon.',
-  autoRefreshExtensions: isZh.value ? '后台同步扩展状态' : 'Sync extension status in background',
+  showRuntimeStatusDescription: isZh.value ? '在插件图标右下角显示启用、异常或处理中状态。' : 'Show enabled, error, or working status at the bottom-right of each plugin icon.',
+  autoRefreshExtensions: isZh.value ? '后台同步插件状态' : 'Sync plugin status in background',
   autoRefreshExtensionsDescription: isZh.value ? '页面打开时正常读取数据，并在停留期间自动同步版本和运行状态。' : 'Load normally when opened and keep versions and runtime status synchronized while the page remains active.',
-  prioritizeUpdates: isZh.value ? '优先显示可更新扩展' : 'Prioritize available updates',
-  prioritizeUpdatesDescription: isZh.value ? '在发现页把有新版本的扩展排在前面，其余扩展保持目录原有顺序。' : 'Place extensions with updates first while preserving catalog order within each group.',
+  prioritizeUpdates: isZh.value ? '优先显示可更新插件' : 'Prioritize available updates',
+  prioritizeUpdatesDescription: isZh.value ? '在发现页把有新版本的插件排在前面，其余插件保持目录原有顺序。' : 'Place plugins with updates first while preserving catalog order within each group.',
   resetSettings: isZh.value ? '恢复默认设置' : 'Restore defaults',
   installedVersion: isZh.value ? '已安装版本' : 'Installed version',
   availableVersion: isZh.value ? '可用版本' : 'Available version',
@@ -829,12 +857,18 @@ const labels = computed(() => ({
   upgradeVersion: isZh.value ? '升级到此版本' : 'Upgrade to this version',
   downgradeVersion: isZh.value ? '降级到此版本' : 'Downgrade to this version',
   reinstallVersion: isZh.value ? '重新安装' : 'Reinstall',
-  downgradeTitle: isZh.value ? '降级扩展？' : 'Downgrade extension?',
+  downgradeTitle: isZh.value ? '降级插件？' : 'Downgrade plugin?',
   downgradeDescription: isZh.value
     ? '旧版本可能无法读取新版本写入的数据。确认后将切换到所选的历史版本。'
     : 'An older release may not understand data written by the current version. Continue with the selected release?',
   releaseDate: isZh.value ? '发布于' : 'Released',
   gitRevision: isZh.value ? 'Git 版本' : 'Git revision',
+  thirdPartyTrustNotice: isZh.value
+    ? '摘要校验用于发现内容漂移，不代表作者身份认证或沙箱隔离。可执行插件会与 Sub-Store 共享运行环境，请只安装你信任的来源。'
+    : 'Digest checks detect content drift; they do not authenticate the publisher or provide sandbox isolation. Executable plugins share the Sub-Store runtime, so install only trusted sources.',
+  localTrustNotice: isZh.value
+    ? '本地插件将与 Sub-Store 共享运行环境。摘要校验不代表作者身份认证或沙箱隔离，请只安装你信任的文件夹。'
+    : 'Local plugins share the Sub-Store runtime. Digest verification is neither publisher authentication nor sandbox isolation, so install only folders you trust.',
 }));
 
 const extensionCard = (entry: ExtensionCatalogEntry): ExtensionCard => ({
@@ -1035,7 +1069,7 @@ const capabilityLabels = (manifest?: ExtensionManifest) => {
     scheduler: isZh.value ? '定时任务' : 'Scheduler',
     'config-project': isZh.value ? '配置项目' : 'Config projects',
     preview: isZh.value ? '预览' : 'Preview',
-    'artifact-source': isZh.value ? '来源扩展' : 'Artifact source',
+    'artifact-source': isZh.value ? '来源插件' : 'Plugin artifact source',
   };
   return (manifest?.capabilities || []).map(capability => map[capability] || capability).slice(0, 5);
 };
@@ -1301,13 +1335,24 @@ const updateBadgeTitle = (card: ExtensionCard) => {
   return version ? `${labels.value.updateAvailable} · v${version}` : labels.value.updateAvailable;
 };
 
+const updateBadgeAriaLabel = (card: ExtensionCard) => (
+  `${labels.value.update} ${card.manifest?.name || card.name}`
+);
+
+const detailActionLabel = (card: ExtensionCard) => (
+  `${labels.value.details} ${card.manifest?.name || card.name}`
+);
+
 const launcherAriaLabel = (card: ExtensionCard) => [
   `${appManagementMode.value ? labels.value.details : labels.value.open} ${card.manifest?.name || card.name}`,
   extensionPreferences.showUpdateBadges && canUpdate(card) ? labels.value.updateAvailable : '',
 ].filter(Boolean).join(' · ');
 
 const discoverCardActionLabel = (card: ExtensionCard) => {
-  return isInstalledCard(card) ? labels.value.added : primaryActionLabel(card);
+  if (canUpdate(card)) return labels.value.update;
+  if (canOpenExtension(card)) return labels.value.open;
+  if (isInstalledCard(card)) return labels.value.added;
+  return primaryActionLabel(card);
 };
 
 const discoverCardActionDisabled = (card: ExtensionCard) => {
@@ -1318,6 +1363,14 @@ const discoverCardActionDisabled = (card: ExtensionCard) => {
 
 const performDiscoverAction = async (card: ExtensionCard) => {
   if (isActionLoading(card.id)) return;
+  if (canUpdate(card)) {
+    openDetails(card.id);
+    return;
+  }
+  if (canOpenExtension(card)) {
+    await openExtension(card);
+    return;
+  }
   if (isInstalledCard(card)) {
     openDetails(card.id);
     return;
@@ -1333,6 +1386,12 @@ const canRollback = (card: ExtensionCard) => (
 
 const sourceIsMissing = (card: ExtensionCard) => card.sourceMissing === true
   || card.availability.sourceMissing === true;
+
+const isThirdPartyPlugin = (card: ExtensionCard) => (
+  Boolean(card.sourceId)
+  || ['community', 'source-executable', 'local-executable'].includes(String(card.distribution || ''))
+  || ['community', 'source-executable', 'local-executable'].includes(String(card.manifest?.distribution || ''))
+);
 
 const managementHint = (card?: ExtensionCard) => {
   if (extensionStore.canManage) return '';
@@ -1574,7 +1633,7 @@ const removeOneSource = (sourceId: string) => {
   Dialog({
     ...extensionConfirmDialogLayer,
     title: labels.value.removeSource,
-    content: isZh.value ? '删除来源不会卸载已经安装的扩展。' : 'Removing a source does not uninstall extensions already installed from it.',
+    content: isZh.value ? '删除来源不会卸载已经安装的插件。' : 'Removing a source does not uninstall plugins already installed from it.',
     textAlign: 'left',
     okText: labels.value.removeSource,
     cancelText: labels.value.close,
@@ -1748,12 +1807,33 @@ const confirmUninstall = (card: ExtensionCard) => {
 };
 
 const refresh = async () => {
-  await extensionStore.refresh({ force: true });
+  await extensionStore.refreshForExtensionPageReload();
 };
 
 const handleResize = () => {
   isMobileViewport.value = window.innerWidth < 600;
 };
+
+const isExtensionStoreRoute = (path: string) => path === '/extensions' || path === '/extensions/discover';
+let previousExtensionStorePath = '';
+
+watch(
+  () => route.path,
+  (path) => {
+    if (!isExtensionStoreRoute(path)) {
+      previousExtensionStorePath = '';
+      return;
+    }
+    const movedWithinExtensionStore = isExtensionStoreRoute(previousExtensionStorePath);
+    previousExtensionStorePath = path;
+    void (movedWithinExtensionStore
+      ? extensionStore.refreshRemoteSourcesIfStale()
+      : extensionStore.refreshForExtensionPageEntry());
+    if (extensionPreferences.autoRefresh) extensionStore.startRevisionSync();
+    else extensionStore.stopRevisionSync();
+  },
+  { immediate: true },
+);
 
 onMounted(() => {
   methodStore.registerMethod(
@@ -1776,8 +1856,6 @@ onMounted(() => {
     EXTENSION_STORE_COMMANDS.localInstall,
     openLocalDirectoryPicker,
   );
-  extensionStore.refresh({ silent: true });
-  if (extensionPreferences.autoRefresh) extensionStore.startRevisionSync();
   window.addEventListener('resize', handleResize);
   if (typeof route.query.id === 'string') openDetails(route.query.id);
 });
@@ -2025,6 +2103,7 @@ onBeforeUnmount(() => {
   box-sizing: border-box;
   align-items: center;
   justify-content: center;
+  padding: 0;
   border: 2px solid var(--background-color);
   border-radius: 50%;
   color: #fff;
@@ -2032,7 +2111,21 @@ onBeforeUnmount(() => {
   box-shadow: 0 2px 7px color-mix(in srgb, var(--primary-text-color) 18%, transparent);
   font-size: 9px;
   line-height: 1;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
   transition: opacity 0.15s ease, visibility 0.15s ease;
+}
+
+.extension-app-update-badge::after {
+  position: absolute;
+  inset: -11px;
+  content: '';
+}
+
+.extension-app-update-badge:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 3px;
 }
 
 .extension-app-controls {
@@ -2213,7 +2306,22 @@ onBeforeUnmount(() => {
   display: flex;
   flex: 0 0 auto;
   align-items: center;
-  gap: 6px;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.detail-actions-management,
+.detail-actions-main,
+.detail-actions-secondary {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.detail-actions-main {
+  min-width: 0;
+  flex: 1 1 auto;
+  justify-content: flex-end;
 }
 
 .details-button,
@@ -2231,12 +2339,6 @@ onBeforeUnmount(() => {
   background: transparent;
 }
 
-.detail-uninstall-button {
-  margin-right: auto;
-  border-color: color-mix(in srgb, var(--danger-color) 35%, var(--divider-color));
-  color: var(--danger-color);
-}
-
 .primary-action {
   border: 1px solid var(--primary-color);
   color: var(--primary-color);
@@ -2248,19 +2350,88 @@ onBeforeUnmount(() => {
   background: var(--primary-color);
 }
 
-.primary-action.danger {
-  border-color: var(--danger-color);
-  color: var(--danger-color);
-}
-
-.primary-action.danger:not(:disabled):hover {
-  color: var(--card-color);
-  background: var(--danger-color);
-}
-
 .primary-action:disabled {
   cursor: not-allowed;
   opacity: 0.45;
+}
+
+.detail-actions .details-button,
+.detail-actions .primary-action {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: 9px;
+  padding: 0 13px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color 0.18s ease, color 0.18s ease, background-color 0.18s ease, opacity 0.18s ease;
+}
+
+.detail-actions .details-button {
+  border: 1px solid color-mix(in srgb, var(--second-text-color) 18%, var(--divider-color));
+  color: var(--second-text-color);
+  background: var(--card-color);
+}
+
+.detail-actions .details-button:not(:disabled):hover {
+  border-color: color-mix(in srgb, var(--primary-color) 30%, var(--divider-color));
+  color: var(--primary-color);
+  background: color-mix(in srgb, var(--primary-color) 6%, var(--card-color));
+}
+
+.detail-actions .detail-uninstall-button {
+  border-color: color-mix(in srgb, var(--danger-color) 28%, var(--divider-color));
+  color: var(--danger-color);
+  background: color-mix(in srgb, var(--danger-color) 6%, var(--card-color));
+}
+
+.detail-actions .detail-uninstall-button:not(:disabled):hover {
+  border-color: color-mix(in srgb, var(--danger-color) 45%, var(--divider-color));
+  color: var(--danger-color);
+  background: color-mix(in srgb, var(--danger-color) 11%, var(--card-color));
+}
+
+.detail-actions .detail-open-button {
+  border-color: color-mix(in srgb, var(--primary-color) 20%, var(--divider-color));
+  color: var(--primary-color);
+  background: color-mix(in srgb, var(--primary-color) 8%, var(--card-color));
+}
+
+.detail-actions .detail-state-button {
+  border-color: color-mix(in srgb, var(--warning-color, #d88900) 42%, var(--divider-color));
+  color: var(--warning-color, #d88900);
+  background: color-mix(in srgb, var(--warning-color, #d88900) 7%, transparent);
+}
+
+.detail-actions .detail-state-button:not(:disabled):hover {
+  border-color: var(--warning-color, #d88900);
+  color: #fff;
+  background: var(--warning-color, #d88900);
+}
+
+.detail-actions .detail-update-button {
+  min-width: 82px;
+  border-color: var(--primary-color);
+  color: #fff;
+  background: var(--primary-color);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--primary-color) 22%, transparent);
+}
+
+.detail-actions .detail-update-button:not(:disabled):hover {
+  border-color: var(--primary-color-end, var(--primary-color));
+  background: var(--primary-color-end, var(--primary-color));
+}
+
+.detail-actions .primary-action:disabled,
+.detail-actions .details-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+  box-shadow: none;
 }
 
 .button-spinner {
@@ -2387,17 +2558,36 @@ onBeforeUnmount(() => {
   width: 100%;
   min-width: 0;
   box-sizing: border-box;
-  grid-template-columns: 64px minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 14px;
   border-bottom: 1px solid var(--divider-color);
   padding: 14px 16px;
   color: var(--comment-text-color);
-  cursor: pointer;
 }
 
 .extension-discover-item:last-child {
   border-bottom: 0;
+}
+
+.extension-discover-details {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 64px minmax(0, 1fr);
+  align-items: center;
+  gap: 14px;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.extension-discover-details:focus-visible {
+  border-radius: 12px;
+  outline: 2px solid var(--primary-color);
+  outline-offset: 4px;
 }
 
 .extension-discover-icon {
@@ -2493,9 +2683,15 @@ onBeforeUnmount(() => {
   background: var(--background-color);
 }
 
+.extension-discover-action.open,
 .extension-discover-action.update {
   color: #fff;
   background: var(--primary-color);
+}
+
+.extension-discover-action.open:not(:disabled):hover,
+.extension-discover-action.update:not(:disabled):hover {
+  background: var(--primary-color-end, var(--primary-color));
 }
 
 .extension-discover-action:disabled {
@@ -2643,6 +2839,20 @@ onBeforeUnmount(() => {
   color: var(--comment-text-color);
   font-size: 13px;
   line-height: 1.6;
+}
+
+.detail-trust-note {
+  margin: 12px 0 0;
+  border-radius: 10px;
+  padding: 10px 12px;
+  color: var(--comment-text-color);
+  background: color-mix(in srgb, var(--warning-color, #d88900) 9%, var(--background-color));
+  font-size: 10px;
+  line-height: 1.55;
+}
+
+.local-install-trust-note {
+  margin-top: 12px;
 }
 
 .detail-section {
@@ -2948,7 +3158,6 @@ onBeforeUnmount(() => {
 }
 
 .detail-actions {
-  justify-content: flex-end;
   margin-top: 0;
   padding: 12px 20px calc(14px + var(--safe-area-bottom, 0px));
   border-top: 1px solid var(--divider-color);
@@ -3260,8 +3469,21 @@ onBeforeUnmount(() => {
   .source-form { grid-template-columns: minmax(0, 1fr); }
   .source-form-actions { justify-content: stretch; }
   .source-form-actions > button { flex: 1 1 0; }
-  .detail-actions { flex-wrap: wrap; }
-  .detail-actions .detail-uninstall-button { margin-right: 0; }
+  .detail-actions {
+    align-items: stretch;
+    flex-direction: column-reverse;
+    gap: 9px;
+  }
+  .detail-actions-management,
+  .detail-actions-main { width: 100%; }
+  .detail-actions-main {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .detail-actions-secondary { width: 100%; }
+  .detail-actions-secondary > button { flex: 1 1 0; }
+  .detail-actions .detail-update-button { width: 100%; }
+  .detail-actions-management .detail-uninstall-button { width: 100%; }
 }
 
 @media screen and (max-width: 599px) {
@@ -3308,9 +3530,14 @@ onBeforeUnmount(() => {
   }
 
   .extension-discover-item {
-    grid-template-columns: 56px minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) auto;
     gap: 11px;
     padding: 12px var(--safe-area-side);
+  }
+
+  .extension-discover-details {
+    grid-template-columns: 56px minmax(0, 1fr);
+    gap: 11px;
   }
 
   .extension-discover-icon {
@@ -3336,7 +3563,11 @@ onBeforeUnmount(() => {
 
 @media screen and (max-width: 420px) {
   .extension-discover-item {
-    grid-template-columns: 52px minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 9px;
+  }
+  .extension-discover-details {
+    grid-template-columns: 52px minmax(0, 1fr);
     gap: 9px;
   }
   .extension-discover-icon {

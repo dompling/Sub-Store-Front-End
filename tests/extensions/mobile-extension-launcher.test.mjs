@@ -42,13 +42,21 @@ test('keeps compact management controls while enlarging their touch targets', as
 test('marks launcher icons when an installed extension has an available update', async () => {
   const source = await readSource('src/views/extensions/ExtensionStore.vue');
   const template = source.slice(0, source.indexOf('<script setup'));
+  const launcherButton = template.match(/<button[\s\S]*?class="extension-app-launcher"[\s\S]*?<\/button>/)?.[0] || '';
+  const badgeButton = template.match(/<button[\s\S]*?class="extension-app-update-badge"[\s\S]*?<\/button>/)?.[0] || '';
 
   assert.match(template, /:aria-label="launcherAriaLabel\(card\)"/);
-  assert.match(template, /v-if="extensionPreferences\.showUpdateBadges && canUpdate\(card\)"[\s\S]*class="extension-app-update-badge"/);
+  assert.match(launcherButton, /class="extension-app-launcher"/);
+  assert.doesNotMatch(launcherButton, /extension-app-update-badge/);
+  assert.match(badgeButton, /v-if="extensionPreferences\.showUpdateBadges && canUpdate\(card\)"/);
+  assert.match(badgeButton, /:aria-label="updateBadgeAriaLabel\(card\)"/);
+  assert.match(badgeButton, /@click\.stop="openDetails\(card\.id\)"/);
   assert.match(template, /v-if="extensionPreferences\.showRuntimeStatus"[\s\S]*class="extension-app-status"/);
   assert.match(source, /updateAvailable:\s*isZh\.value \? '有可用更新' : 'Update available'/);
+  assert.match(source, /const updateBadgeAriaLabel = \(card: ExtensionCard\)/);
   assert.match(source, /const launcherAriaLabel = \(card: ExtensionCard\)/);
   assert.match(source, /\.extension-app-update-badge\s*\{/);
+  assert.match(source, /\.extension-app-update-badge::after\s*\{[\s\S]*inset:\s*-11px/);
   assert.match(source, /\.extension-app-grid\.managing \.extension-app-update-badge/);
 });
 

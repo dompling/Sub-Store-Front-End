@@ -56,6 +56,8 @@ type RefreshOptions = { silent?: boolean; force?: boolean };
 const refreshFlights = new WeakMap<object, Promise<boolean>>();
 const queuedRefreshFlights = new WeakMap<object, Promise<boolean>>();
 const refreshFlightHosts = new WeakMap<object, string>();
+const remoteSourceRefreshFlights = new WeakMap<object, Promise<boolean>>();
+const REMOTE_SOURCE_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 
 const normalizeHostIdentity = (value: string) => {
   const normalized = String(value || '')
@@ -884,6 +886,102 @@ export const useExtensionsStore = defineStore('extensions', {
       }
     },
 
+    async refreshRemoteSources() {
+      const storeIdentity = this as unknown as object;
+      const activeFlight = remoteSourceRefreshFlights.get(storeIdentity);
+      if (activeFlight) return activeFlight;
+      if (!this.sources.length || this.runtime?.runtime !== 'node') return true;
+
+      const requestHostUrl = normalizeHostIdentity(getHostAPIUrl());
+      const refreshFlight = (async () => {
+        try {
+          const response = await api.refreshAllSources();
+          if (normalizeHostIdentity(getHostAPIUrl()) !== requestHostUrl) {
+            this.resetRuntimeSnapshot(normalizeHostIdentity(getHostAPIUrl()));
+            return false;
+          }
+          // Old Hosts cannot perform token-independent discovery refreshes.
+          // Keep their last trusted snapshot without surfacing an error.
+          if (response?.status === 404 || response?.status === 405) return true;
+          if (!response || response.status < 200 || response.status >= 300) return false;
+          return true;
+        } catch {
+          // A remote catalog outage must not erase the last trusted catalog or
+          // turn normal page entry into a blocking error.
+          return false;
+        }
+      })();
+
+      const trackedFlight = refreshFlight.finally(() => {
+        if (remoteSourceRefreshFlights.get(storeIdentity) === trackedFlight) {
+          remoteSourceRefreshFlights.delete(storeIdentity);
+        }
+      });
+      remoteSourceRefreshFlights.set(storeIdentity, trackedFlight);
+      return trackedFlight;
+    },
+
+    async refreshForExtensionPageEntry() {
+      await this.refresh({ silent: true, force: true });
+      if (!this.sources.length || this.runtime?.runtime !== 'node') return true;
+      await this.refreshRemoteSources();
+      // Re-read even after a partial/failed remote check: the Host may have
+      // updated other sources while retaining the failed source's old entries.
+      await this.refresh({ silent: true, force: true });
+      const state = this as any;
+      state.__remoteSourceLastRefreshAt = Date.now();
+      state.__remoteSourceRefreshHost = normalizeHostIdentity(getHostAPIUrl());
+      return true;
+    },
+
+    async refreshForExtensionPageReload() {
+      await this.refresh({ silent: true, force: true });
+      if (!this.sources.length || this.runtime?.runtime !== 'node') return true;
+      this.sourceActionError = '';
+      try {
+        const response = await api.refreshAllSources(
+          this.canManage ? this.controlOptions() : undefined,
+        );
+        if (!response || response.status < 200 || response.status >= 300) {
+          this.sourceActionError = responseError(response);
+          return false;
+        }
+        const payload = responsePayload(response);
+        const failureCount = Number(payload?.failureCount || 0);
+        const successCount = Number(payload?.successCount || 0);
+        await this.refresh({ silent: true, force: true });
+        if (failureCount > 0) {
+          this.sourceActionError = successCount > 0
+            ? 'EXTENSION_SOURCE_REFRESH_PARTIAL_FAILED'
+            : 'EXTENSION_SOURCE_REFRESH_FAILED';
+          return successCount > 0;
+        }
+        return true;
+      } catch (error: any) {
+        if (isAdminAuthFailure(error)) this.clearAdminToken();
+        this.sourceActionError = error?.response
+          ? responseError(error.response)
+          : error?.message || 'EXTENSION_SOURCE_REFRESH_FAILED';
+        return false;
+      }
+    },
+
+    async refreshRemoteSourcesIfStale() {
+      if (!this.sources.length || this.runtime?.runtime !== 'node') return true;
+      const state = this as any;
+      const host = normalizeHostIdentity(getHostAPIUrl());
+      if (state.__remoteSourceRefreshHost !== host) {
+        state.__remoteSourceLastRefreshAt = 0;
+        state.__remoteSourceRefreshHost = host;
+      }
+      const lastRefreshAt = Number(state.__remoteSourceLastRefreshAt || 0);
+      if (Date.now() - lastRefreshAt < REMOTE_SOURCE_REFRESH_INTERVAL_MS) return true;
+      state.__remoteSourceLastRefreshAt = Date.now();
+      const succeeded = await this.refreshRemoteSources();
+      await this.refresh({ silent: true, force: true });
+      return succeeded;
+    },
+
     async addSource(url: string, name = '') {
       this.sourceActionError = '';
       const options = this.sourceControlOptions({
@@ -992,12 +1090,21 @@ export const useExtensionsStore = defineStore('extensions', {
       if (state.__revisionSyncStarted) return;
       state.__revisionSyncStarted = true;
       state.__revisionTimer = window.setInterval(() => {
-        if (document.visibilityState === 'visible') this.refreshOnRevisionFence();
+        if (document.visibilityState === 'visible') {
+          this.refreshOnRevisionFence();
+          this.refreshRemoteSourcesIfStale();
+        }
       }, 30000);
       state.__revisionVisibility = () => {
-        if (document.visibilityState === 'visible') this.refreshOnRevisionFence();
+        if (document.visibilityState === 'visible') {
+          this.refreshOnRevisionFence();
+          this.refreshRemoteSourcesIfStale();
+        }
       };
-      state.__revisionOnline = () => this.refreshOnRevisionFence();
+      state.__revisionOnline = () => {
+        this.refreshOnRevisionFence();
+        this.refreshRemoteSourcesIfStale();
+      };
       document.addEventListener('visibilitychange', state.__revisionVisibility);
       window.addEventListener('online', state.__revisionOnline);
     },

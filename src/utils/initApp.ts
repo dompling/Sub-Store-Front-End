@@ -6,6 +6,7 @@ import { useGlobalStore } from "@/store/global";
 import { useSettingsStore } from "@/store/settings";
 import { useSubsStore } from "@/store/subs";
 import { useExtensionsStore } from "@/store/extensions";
+import { useExtensionPreferencesStore } from "@/store/extensionPreferences";
 import { EXTENSION_IDS } from "@/extensions/registry";
 // import { Toast } from '@nutui/nutui';
 
@@ -20,6 +21,7 @@ export const initStores = async (
   const artifactsStore = useArtifactsStore();
   const settingsStore = useSettingsStore();
   const extensionsStore = useExtensionsStore();
+  const extensionPreferences = useExtensionPreferencesStore();
 
   const { t } = i18n.global;
   let isSucceed = true;
@@ -78,7 +80,8 @@ export const initStores = async (
     // 时才读取 Artifact，避免 disabled/missing 的结构化 409 被误判为
     // 整个 Sub-Store 后端不可用。
     await extensionsStore.refresh({ silent: true });
-    extensionsStore.startRevisionSync();
+    if (extensionPreferences.autoRefresh) extensionsStore.startRevisionSync();
+    else extensionsStore.stopRevisionSync();
     const configHosting = extensionsStore.availability(
       EXTENSION_IDS.CONFIG_HOSTING
     );

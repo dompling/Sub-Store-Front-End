@@ -35,6 +35,8 @@
               @click.stop="refresh"
               class="navBar-left-icon navBar-left-icon--refresh"
               :style="{ left: navLeftButtonLeft.refresh }"
+              :aria-label="refreshButtonLabel"
+              :title="refreshButtonLabel"
             >
               <font-awesome-icon
                 class="icon fa-arrow-rotate-right"
@@ -395,6 +397,9 @@ const listSearchPlaceholder = computed(() => route.meta.listSearchPlaceholderKey
 const extensionManagementLabel = computed(() => extensionsStore.launcherManagementMode
   ? t('navBar.extensionStore.done')
   : t('navBar.extensionStore.manage'));
+const refreshButtonLabel = computed(() => route.path.startsWith('/extensions')
+  ? t('navBar.extensionStore.refresh')
+  : t('logsPage.refresh'));
 const navLeftButtonLeft = computed<Record<string, string>>(() => {
   if (isNeedBack.value) {
     if (route.path === "/shares") {
@@ -633,7 +638,15 @@ const refresh = async () => {
   if (["/preview"].includes(route.path)) {
     window.location.reload();
   } else if (route.path === "/extensions") {
-    await extensionsStore.refresh({ force: true });
+    const succeeded = await extensionsStore.refreshForExtensionPageReload();
+    if (extensionsStore.sourceActionError) {
+      showNotify({
+        title: extensionsStore.sourceActionError === 'EXTENSION_SOURCE_REFRESH_PARTIAL_FAILED'
+          ? t('navBar.extensionStore.refreshPartialFailed')
+          : t('navBar.extensionStore.refreshFailed'),
+        type: succeeded ? 'warning' : 'danger',
+      });
+    }
   } else if (["/subs", "/sync", "/files"].includes(route.path)) {
     initStores(true, true, true);
   } else {

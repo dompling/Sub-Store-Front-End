@@ -35,6 +35,7 @@ import type { Component } from 'vue';
 import { computed, markRaw, onMounted, ref, shallowRef, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useExtensionsStore } from '@/store/extensions';
+import { useExtensionPreferencesStore } from '@/store/extensionPreferences';
 import {
   disposeFrontendExtension,
   ensureFrontendExtensionDefinition,
@@ -47,6 +48,7 @@ import {
 const route = useRoute();
 const router = useRouter();
 const extensionStore = useExtensionsStore();
+const extensionPreferences = useExtensionPreferencesStore();
 const bootstrapped = ref(false);
 const surfaceComponent = shallowRef<Component | null>(null);
 const surfaceLoadError = ref('');
@@ -68,7 +70,7 @@ const extensionName = computed(() => (
   availability.value.manifest?.name
   || frontendDefinition.value?.manifest?.name
   || extensionId.value
-  || '扩展'
+  || '插件'
 ));
 const refreshing = computed(() => extensionStore.refreshing);
 const surfaceReady = computed(() => ['enabled', 'bundled'].includes(availability.value.status));
@@ -149,53 +151,53 @@ const labels = computed(() => isZh.value ? {
   retry: '重新读取',
   loadingTitle: `正在读取${extensionName.value}状态`,
   loadingDescription: `确认插件运行状态后加载${extensionName.value}页面。`,
-  store: '打开扩展商店',
+  store: '打开插件',
   reinstall: `重新安装${extensionName.value}`,
   disabledTitle: `${extensionName.value}已停用`,
   disabledDescription: '插件数据仍会保留。启用后可以继续访问当前功能。',
   installedTitle: `${extensionName.value}尚未启用`,
-  installedDescription: '安装已完成，请在扩展商店启用后继续使用。',
+  installedDescription: '安装已完成，请在插件详情中启用后继续使用。',
   missingTitle: `${extensionName.value}尚未安装`,
-  missingDescription: `从扩展商店安装${extensionName.value}后，当前页面会自动恢复。`,
+  missingDescription: `从插件页面安装${extensionName.value}后，当前页面会自动恢复。`,
   reinstallTitle: `${extensionName.value}已卸载，数据已保留`,
   reinstallBackupTitle: '数据已恢复，需重新安装插件',
   reinstallDescription: '插件数据和引用仍保留，重新安装后即可继续使用。',
   incompatibleTitle: `当前后端不兼容${extensionName.value}`,
-  incompatibleDescription: '请升级后端，或在扩展商店查看可用的运行实现。',
+  incompatibleDescription: '请升级后端，或在插件详情中查看可用的运行实现。',
   activationFailedTitle: `${extensionName.value}启动失败`,
-  activationFailedDescription: '已保留安装记录和数据。请在扩展商店重试，或查看后端日志。',
+  activationFailedDescription: '已保留安装记录和数据。请在插件详情中重试，或查看后端日志。',
   unknownTitle: `暂时无法读取${extensionName.value}状态`,
   unknownDescription: '未启用兼容兜底，以免绕过已经停用或卸载的插件。请检查后端连接后重试。',
   pendingTitle: `${extensionName.value}正在处理中`,
   pendingDescription: '安装或更新完成后，此页面会自动恢复。',
   frontendFailedTitle: `${extensionName.value}页面加载失败`,
-  frontendFailedDescription: '后端状态已保留，可以重试页面加载或从扩展商店处理。',
+  frontendFailedDescription: '后端状态已保留，可以重试页面加载或从插件详情处理。',
   open: `打开${extensionName.value}`,
 } : {
   retry: 'Retry',
   loadingTitle: `Reading ${extensionName.value} status`,
-  loadingDescription: 'The page will load after the extension handshake completes.',
-  store: 'Open extension store',
+  loadingDescription: 'The page will load after the plugin handshake completes.',
+  store: 'Open plugins',
   reinstall: `Reinstall ${extensionName.value}`,
   disabledTitle: `${extensionName.value} is disabled`,
-  disabledDescription: 'Extension data is retained. Enable it to continue.',
+  disabledDescription: 'Plugin data is retained. Enable it to continue.',
   installedTitle: `${extensionName.value} is not enabled`,
-  installedDescription: 'Installation is complete. Enable the extension to continue.',
+  installedDescription: 'Installation is complete. Enable the plugin to continue.',
   missingTitle: `${extensionName.value} is not installed`,
-  missingDescription: `Install ${extensionName.value} from the extension store to restore this page.`,
+  missingDescription: `Install ${extensionName.value} from Plugins to restore this page.`,
   reinstallTitle: `${extensionName.value} was uninstalled; data is retained`,
   reinstallBackupTitle: 'Data restored; reinstall required',
-  reinstallDescription: 'Extension data and references remain available after reinstall.',
+  reinstallDescription: 'Plugin data and references remain available after reinstall.',
   incompatibleTitle: `This backend is incompatible with ${extensionName.value}`,
   incompatibleDescription: 'Upgrade the backend or review available runtime variants in the store.',
   activationFailedTitle: `${extensionName.value} failed to start`,
-  activationFailedDescription: 'Installation records and data were retained. Retry in the extension store or inspect backend logs.',
+  activationFailedDescription: 'Installation records and data were retained. Retry in plugin details or inspect backend logs.',
   unknownTitle: `${extensionName.value} status is unavailable`,
   unknownDescription: 'Compatibility fallback remains closed so a disabled or removed plugin cannot be bypassed. Check the backend and retry.',
   pendingTitle: `${extensionName.value} is being updated`,
   pendingDescription: 'This page will recover after the lifecycle task finishes.',
   frontendFailedTitle: `${extensionName.value} surface failed to load`,
-  frontendFailedDescription: 'The backend state is retained. Retry or use the extension store.',
+  frontendFailedDescription: 'The backend state is retained. Retry or use plugin details.',
   open: `Open ${extensionName.value}`,
 });
 
@@ -263,7 +265,8 @@ onMounted(async () => {
   } finally {
     bootstrapped.value = true;
   }
-  extensionStore.startRevisionSync();
+  if (extensionPreferences.autoRefresh) extensionStore.startRevisionSync();
+  else extensionStore.stopRevisionSync();
 });
 </script>
 

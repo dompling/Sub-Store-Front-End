@@ -79,13 +79,13 @@ const validateDirectoryFiles = (
   if (!files.length) {
     throw new ExtensionDirectoryError(
       'EXTENSION_DIRECTORY_EMPTY',
-      'Select a directory that contains an extension package.',
+      'Select a directory that contains a plugin package.',
     );
   }
   if (files.length > EXTENSION_DIRECTORY_LIMITS.maxFiles) {
     throw new ExtensionDirectoryError(
       'EXTENSION_DIRECTORY_FILE_COUNT_EXCEEDED',
-      `Extension directories may contain at most ${EXTENSION_DIRECTORY_LIMITS.maxFiles} files.`,
+      `Plugin directories may contain at most ${EXTENSION_DIRECTORY_LIMITS.maxFiles} files.`,
       { count: files.length, limit: EXTENSION_DIRECTORY_LIMITS.maxFiles },
     );
   }
@@ -105,7 +105,7 @@ const validateDirectoryFiles = (
     if (rootName !== currentRoot) {
       throw new ExtensionDirectoryError(
         'EXTENSION_DIRECTORY_MULTIPLE_ROOTS',
-        'Select exactly one extension directory.',
+        'Select exactly one plugin directory.',
         { expectedRoot: rootName, actualRoot: currentRoot },
       );
     }
@@ -114,7 +114,7 @@ const validateDirectoryFiles = (
     if (seen.has(relativePath)) {
       throw new ExtensionDirectoryError(
         'EXTENSION_DIRECTORY_DUPLICATE_PATH',
-        `The extension directory contains a duplicate path: ${relativePath}`,
+        `The plugin directory contains a duplicate path: ${relativePath}`,
         { path: relativePath },
       );
     }
@@ -124,7 +124,7 @@ const validateDirectoryFiles = (
     if (collidingPath && collidingPath !== relativePath) {
       throw new ExtensionDirectoryError(
         'EXTENSION_DIRECTORY_PATH_COLLISION',
-        `The extension directory contains colliding paths: ${collidingPath}, ${relativePath}`,
+        `The plugin directory contains colliding paths: ${collidingPath}, ${relativePath}`,
         { paths: [collidingPath, relativePath] },
       );
     }
@@ -135,7 +135,7 @@ const validateDirectoryFiles = (
     if (size > EXTENSION_DIRECTORY_LIMITS.maxFileBytes) {
       throw new ExtensionDirectoryError(
         'EXTENSION_DIRECTORY_FILE_TOO_LARGE',
-        `Extension files may not exceed ${EXTENSION_DIRECTORY_LIMITS.maxFileBytes} bytes.`,
+        `Plugin files may not exceed ${EXTENSION_DIRECTORY_LIMITS.maxFileBytes} bytes.`,
         { path: relativePath, size, limit: EXTENSION_DIRECTORY_LIMITS.maxFileBytes },
       );
     }
@@ -146,14 +146,14 @@ const validateDirectoryFiles = (
     if (payloadFiles > EXTENSION_DIRECTORY_LIMITS.maxPayloadFiles) {
       throw new ExtensionDirectoryError(
         'EXTENSION_DIRECTORY_FILE_COUNT_EXCEEDED',
-        `Extension directories may contain at most ${EXTENSION_DIRECTORY_LIMITS.maxPayloadFiles} payload files.`,
+        `Plugin directories may contain at most ${EXTENSION_DIRECTORY_LIMITS.maxPayloadFiles} payload files.`,
         { count: payloadFiles, limit: EXTENSION_DIRECTORY_LIMITS.maxPayloadFiles },
       );
     }
     if (payloadBytes > EXTENSION_DIRECTORY_LIMITS.maxPayloadBytes) {
       throw new ExtensionDirectoryError(
         'EXTENSION_DIRECTORY_TOO_LARGE',
-        `Extension payloads may not exceed ${EXTENSION_DIRECTORY_LIMITS.maxPayloadBytes} bytes.`,
+        `Plugin payloads may not exceed ${EXTENSION_DIRECTORY_LIMITS.maxPayloadBytes} bytes.`,
         { totalBytes: payloadBytes, limit: EXTENSION_DIRECTORY_LIMITS.maxPayloadBytes },
       );
     }
@@ -183,7 +183,7 @@ const decodeUtf8 = async ({ file, relativePath }: ValidatedDirectoryFile) => {
   } catch {
     throw new ExtensionDirectoryError(
       'EXTENSION_DIRECTORY_TEXT_INVALID',
-      `Extension directory files must be valid UTF-8 text: ${relativePath}`,
+      `Plugin directory files must be valid UTF-8 text: ${relativePath}`,
       { path: relativePath },
     );
   }

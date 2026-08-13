@@ -185,6 +185,8 @@ export interface ExtensionSource {
   entryCount?: number;
   /** Backward-compatible UI alias used by older source adapters. */
   lastFetchedAt?: number;
+  /** Last persisted source change reported by the current Extension Host. */
+  updatedAt?: number;
   extensionCount?: number;
   lastError?: { code?: string; message?: string } | null;
   revision?: string | number;

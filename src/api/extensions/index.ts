@@ -85,6 +85,14 @@ export function useExtensionsApi() {
       // is a valid response for an older host and is handled by the store.
       validateStatus: status => (status >= 200 && status < 300) || status === 404 || status === 405,
     }),
+    refreshAllSources: (options?: ExtensionControlOptions) => extensionRequest({
+      url: options ? '/api/admin/extensions/sources/refresh' : '/api/extensions/sources/refresh',
+      method: 'post',
+      headers: options ? controlHeaders(options) : undefined,
+      // Older Hosts only expose manual, administrator-controlled single-source
+      // refresh. Page-entry discovery must degrade to the cached snapshot.
+      validateStatus: status => (status >= 200 && status < 300) || status === 404 || status === 405,
+    }),
     getOne: (id: string) => extensionRequest({
       url: `/api/extensions/${encodeURIComponent(id)}`,
       method: 'get',

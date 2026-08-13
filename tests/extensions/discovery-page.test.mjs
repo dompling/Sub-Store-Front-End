@@ -28,7 +28,7 @@ test('registers a searchable App Store-style discovery route with extension sett
   assert.match(navBar, /v-if="showLocalInstallButton"[\s\S]*invokePageAction\('localInstallCommand'\)[\s\S]*fa-solid fa-folder-open/);
 });
 
-test('discovery keeps every catalog entry visible and labels installed extensions as added', async () => {
+test('discovery keeps every catalog entry visible and uses App Store-style open actions for installed plugins', async () => {
   const source = await readSource('src/views/extensions/ExtensionStore.vue');
   const template = source.slice(0, source.indexOf('<script setup'));
 
@@ -39,7 +39,20 @@ test('discovery keeps every catalog entry visible and labels installed extension
   assert.match(source, /const discoverCards = computed\(/);
   assert.match(source, /allCards\.value\.filter\(card => cardMatchesSearch\(card/);
   assert.match(source, /listSearchStore\.normalizedQuery/);
-  assert.match(source, /return isInstalledCard\(card\) \? labels\.value\.added/);
+  assert.match(template, /class="extension-discover-details"[\s\S]*:aria-label="detailActionLabel\(card\)"[\s\S]*@click="openDetails\(card\.id\)"/);
+  assert.doesNotMatch(template, /class="extension-discover-item"[\s\S]*role="button"/);
+  const actionLabelBlock = source.match(/const discoverCardActionLabel = \(card: ExtensionCard\) => \{[\s\S]*?\n\};/)?.[0] || '';
+  const discoverActionBlock = source.match(/const performDiscoverAction = async \(card: ExtensionCard\) => \{[\s\S]*?\n\};/)?.[0] || '';
+
+  assert.match(actionLabelBlock, /if \(canUpdate\(card\)\) return labels\.value\.update;/);
+  assert.match(actionLabelBlock, /if \(canOpenExtension\(card\)\) return labels\.value\.open;/);
+  assert.match(actionLabelBlock, /if \(isInstalledCard\(card\)\) return labels\.value\.added;/);
+  assert.match(discoverActionBlock, /if \(canUpdate\(card\)\) \{[\s\S]*openDetails\(card\.id\);/);
+  assert.match(discoverActionBlock, /if \(canOpenExtension\(card\)\) \{[\s\S]*await openExtension\(card\);/);
+  assert.match(discoverActionBlock, /if \(isInstalledCard\(card\)\) \{[\s\S]*openDetails\(card\.id\);/);
+  assert.doesNotMatch(discoverActionBlock, /extensionStore\.update\(card\.id\)/);
+  assert.match(template, /open: canOpenExtension\(card\) && !canUpdate\(card\)/);
+  assert.match(source, /\.extension-discover-action\.open,[\s\S]*\.extension-discover-action\.update\s*\{[\s\S]*color:\s*#fff;[\s\S]*background:\s*var\(--primary-color\)/);
 });
 
 test('persists lightweight extension display and discovery preferences', async () => {
@@ -63,4 +76,22 @@ test('persists lightweight extension display and discovery preferences', async (
   assert.match(view, /EXTENSION_STORE_COMMANDS\.settings/);
   assert.match(view, /EXTENSION_STORE_COMMANDS\.sources/);
   assert.match(view, /EXTENSION_STORE_COMMANDS\.localInstall/);
+});
+
+test('organizes plugin detail actions by semantic priority', async () => {
+  const source = await readSource('src/views/extensions/ExtensionStore.vue');
+  const template = source.slice(0, source.indexOf('<script setup'));
+  const detailActions = template.match(/<div class="detail-actions">[\s\S]*?<\/div>\s*<\/div>\s*<\/nut-popup>/)?.[0] || '';
+
+  assert.match(detailActions, /class="detail-actions-management"[\s\S]*class="details-button detail-uninstall-button"/);
+  assert.match(detailActions, /class="detail-actions-main"/);
+  assert.match(detailActions, /class="detail-actions-secondary"/);
+  assert.match(detailActions, /class="details-button detail-open-button"/);
+  assert.match(detailActions, /class="primary-action detail-update-button"/);
+  assert.match(detailActions, /'detail-state-button': canDisable\(selectedCard\.id\)/);
+  assert.doesNotMatch(detailActions, /@click="detailVisible = false"/);
+
+  assert.match(source, /\.detail-actions \.detail-update-button\s*\{[\s\S]*background:\s*var\(--primary-color\)/);
+  assert.match(source, /\.detail-actions \.detail-open-button\s*\{[\s\S]*color-mix\(in srgb, var\(--primary-color\)/);
+  assert.match(source, /\.detail-actions \.detail-state-button\s*\{[\s\S]*var\(--warning-color, #d88900\)/);
 });
