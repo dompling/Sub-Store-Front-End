@@ -222,7 +222,8 @@
           v-if="
             sourceInput &&
             (['subscription', 'collection'].includes(form.type) ||
-              artifactPlatformOptions.length > 0)
+              artifactPlatformOptions.length > 0 ||
+              artifactRepresentationOptions.length > 0)
           "
         >
           <nut-form-item
@@ -249,11 +250,15 @@
             </div>
           </nut-form-item>
 
-          <nut-form-item :label="$t(`syncPage.addArtForm.platform.label`)">
+          <nut-form-item
+            v-if="artifactPlatformOptions.length"
+            :label="$t(`syncPage.addArtForm.platform.label`)"
+          >
             <nut-radiogroup
               direction="horizontal"
               v-model="form.platform"
               class="artifact-radio-group"
+              @change="platformChange"
             >
               <nut-radio
                 v-for="platform in artifactPlatformOptions"
@@ -276,7 +281,37 @@
               </nut-radio>
             </nut-radiogroup>
           </nut-form-item>
+
+          <nut-form-item
+            v-if="currentExtensionArtifactSource && artifactRepresentationOptions.length"
+            :label="$t(`syncPage.addArtForm.representation.label`)"
+          >
+            <nut-radiogroup
+              direction="horizontal"
+              v-model="form.representation"
+              class="artifact-radio-group artifact-representation-group"
+              @change="representationChange"
+            >
+              <nut-radio
+                v-for="representation in artifactRepresentationOptions"
+                :key="representation"
+                :label="representation"
+              >
+                {{ artifactRepresentationLabel(representation) }}
+              </nut-radio>
+            </nut-radiogroup>
+          </nut-form-item>
         </template>
+
+        <div
+          v-if="resourceSourceNotice"
+          class="resource-source-notice"
+          :class="`status-${resourceSourceNotice.status}`"
+          role="status"
+        >
+          <nut-icon name="tips" />
+          <span>{{ resourceSourceNotice.message }}</span>
+        </div>
         </div>
       </nut-form>
     </div>
@@ -331,11 +366,23 @@ import { useSystemStore } from "@/store/system";
 import { useExtensionsStore } from "@/store/extensions";
 import { useExtensionsApi } from "@/api/extensions";
 import { useBackend } from "@/hooks/useBackend";
-import type { ExtensionArtifactSourceDescriptor } from "@/extensions/contracts";
+import type {
+  ExtensionArtifactSourceDescriptor,
+  ExtensionArtifactSourceItem,
+  ResourceAvailabilityStatus,
+} from "@/extensions/contracts";
 import { resolveArtifactIcon } from "@/utils/artifactIcon";
 import {
+  artifactSourceContributionId,
   artifactSourcePlatforms,
+  artifactSourceRepresentations,
+  artifactSourceSelection,
+  findArtifactSourceByRef,
   findArtifactSourceDescriptor,
+  findArtifactSourceItem,
+  isResourceRefV1,
+  resourceRefFromArtifactSource,
+  resolveArtifactSourceRepresentation,
   resolveArtifactSourcePlatform,
 } from "@/utils/artifactSourcePlatforms";
 import {
@@ -366,6 +413,7 @@ const SYNC_EDITOR_PROP_TO_TAB: Partial<Record<string, SyncEditorTab>> = {
   isIconColor: "display",
   iconFit: "display",
   source: "content",
+  representation: "content",
   "age-public-key": "content",
   cron: "content",
 };
@@ -475,6 +523,8 @@ const form = reactive<any>({
   isIconColor: true,
   iconFit: undefined,
   source: "",
+  sourceRef: undefined,
+  representation: "",
   type: "file",
   platform: "Stash",
   sync: false,
@@ -502,7 +552,14 @@ const artifactSourceLabel = (source: ExtensionArtifactSourceDescriptor) => {
   const ownerName = source.ownerExtensionId
     ? extensionsStore.manifest(source.ownerExtensionId)?.name
     : undefined;
-  return ownerName || source.type;
+  const contribution = artifactSourceContributionId(source);
+  const sameTypeCount = extensionArtifactSources.value.filter(
+    candidate => candidate.type === source.type,
+  ).length;
+  const base = ownerName || source.type;
+  return sameTypeCount > 1 && contribution
+    ? `${base} · ${contribution}`
+    : base;
 };
 
 const unwrapArtifactSources = (response: any): ExtensionArtifactSourceDescriptor[] => {
@@ -522,6 +579,17 @@ const unwrapArtifactSources = (response: any): ExtensionArtifactSourceDescriptor
     && Array.isArray(item.items)
   )) as ExtensionArtifactSourceDescriptor[];
 };
+
+const isSelectableArtifactSource = (source: ExtensionArtifactSourceDescriptor) => (
+  ['enabled', 'bundled'].includes(source.status)
+  && source.items.length > 0
+  && (
+    Boolean(artifactSourceContributionId(source) && source.contract)
+    || extensionArtifactSources.value.filter(
+      candidate => candidate.type === source.type,
+    ).length === 1
+  )
+);
 
 const fetchExtensionArtifactSources = async () => {
   try {
@@ -585,13 +653,19 @@ const sourceOptions = computed(() => {
   }
 
   extensionArtifactSources.value
-    .filter(source => source.status === 'enabled' && source.items.length > 0)
+    .filter(isSelectableArtifactSource)
     .forEach(source => {
+      const contributionId = artifactSourceContributionId(source);
+      // Only strict Broker sources receive a contribution-id picker value.
+      // Legacy providers keep the historical type/name model.
+      const value = contributionId && source.contract
+        ? contributionId
+        : source.type;
       options.push({
-        value: source.type,
+        value,
         text: artifactSourceLabel(source),
         children: source.items.map(item => ({
-          value: item.name,
+          value: item.ref?.id || item.name,
           text: item.displayName || item.name,
         })),
       });
@@ -600,9 +674,26 @@ const sourceOptions = computed(() => {
   return options;
 });
 
-const currentExtensionArtifactSource = computed(() =>
-  findArtifactSourceDescriptor(extensionArtifactSources.value, form.type),
-);
+const currentExtensionArtifactSource = computed(() => {
+  if (isResourceRefV1(form.sourceRef)) {
+    return findArtifactSourceByRef(
+      extensionArtifactSources.value,
+      form.sourceRef,
+    );
+  }
+  return findArtifactSourceDescriptor(
+    extensionArtifactSources.value,
+    sourceModel.value[0] || form.type,
+  );
+});
+const currentExtensionArtifactSourceItem = computed(() => {
+  const source = currentExtensionArtifactSource.value;
+  if (!source) return undefined;
+  return findArtifactSourceItem(
+    source,
+    isResourceRefV1(form.sourceRef) ? form.sourceRef.id : form.source,
+  );
+});
 const artifactPlatformOptions = computed(() => {
   const extensionPlatforms = artifactSourcePlatforms(
     currentExtensionArtifactSource.value,
@@ -613,6 +704,12 @@ const artifactPlatformOptions = computed(() => {
       ? BUILTIN_ARTIFACT_PLATFORMS
       : [];
 });
+const artifactRepresentationOptions = computed(() =>
+  artifactSourceRepresentations(
+    currentExtensionArtifactSource.value,
+    currentExtensionArtifactSourceItem.value,
+  ),
+);
 const artifactPlatformLabel = (platform: string) => ({
   Clash: "Clash(Deprecated)",
   ClashMeta: "mihomo",
@@ -620,25 +717,129 @@ const artifactPlatformLabel = (platform: string) => ({
   ShadowRocket: "Shadowrocket",
   SurgeMac: "Surge Mac",
 }[platform] || platform);
+const artifactRepresentationLabel = (representation: string) => {
+  const source = currentExtensionArtifactSource.value;
+  const index = source?.representations?.indexOf(representation) ?? -1;
+  const platform = index >= 0 ? source?.platforms?.[index] : undefined;
+  return platform
+    ? `${artifactPlatformLabel(platform)} · ${representation}`
+    : representation;
+};
 const normalizeSelectedArtifactPlatform = () => {
   form.platform = resolveArtifactSourcePlatform({
-    sources: extensionArtifactSources.value,
-    type: form.type,
+    source: currentExtensionArtifactSource.value,
+    item: currentExtensionArtifactSourceItem.value,
+    representation: form.representation,
     platform: form.platform,
   });
 };
 
+const normalizeSelectedArtifactRepresentation = () => {
+  if (!currentExtensionArtifactSource.value) return;
+  if (
+    isResourceRefV1(form.sourceRef)
+    && form.representation
+    && !artifactRepresentationOptions.value.includes(form.representation)
+  ) {
+    // Persisted precise records fail closed if a provider removes a format;
+    // they must not silently drift to the provider's new first item.
+    return;
+  }
+  form.representation = resolveArtifactSourceRepresentation({
+    source: currentExtensionArtifactSource.value,
+    item: currentExtensionArtifactSourceItem.value,
+    representation: form.representation,
+    platform: form.platform,
+  });
+};
+
+const providerStatusLabel = (status: string) => ({
+  disabled: t("syncPage.addArtForm.sourceStatus.disabled"),
+  missing: t("syncPage.addArtForm.sourceStatus.missing"),
+  incompatible: t("syncPage.addArtForm.sourceStatus.incompatible"),
+  updating: t("syncPage.addArtForm.sourceStatus.updating"),
+}[status] || t("syncPage.addArtForm.sourceStatus.unavailable"));
+
+const resourceSourceStatus = computed<ResourceAvailabilityStatus | "unavailable" | "">(() => {
+  if (!isResourceRefV1(form.sourceRef)) return "";
+  const source = currentExtensionArtifactSource.value;
+  if (!source) return "missing";
+  if (!['enabled', 'bundled'].includes(source.status)) {
+    return ['disabled', 'missing', 'incompatible', 'updating'].includes(source.status)
+      ? source.status as ResourceAvailabilityStatus
+      : "unavailable";
+  }
+  const itemStatus = currentExtensionArtifactSourceItem.value?.availability?.status;
+  if (itemStatus && itemStatus !== "available") return itemStatus;
+  return currentExtensionArtifactSourceItem.value ? "" : "unavailable";
+});
+
+const selectedRepresentationUnsupported = computed(() => (
+  isResourceRefV1(form.sourceRef)
+  && Boolean(currentExtensionArtifactSource.value)
+  && ['enabled', 'bundled'].includes(currentExtensionArtifactSource.value!.status)
+  && Boolean(currentExtensionArtifactSourceItem.value)
+  && Boolean(form.representation)
+  && !artifactRepresentationOptions.value.includes(form.representation)
+));
+
+const legacySourceAmbiguous = computed(() => (
+  !isResourceRefV1(form.sourceRef)
+  && Boolean(form.type)
+  && extensionArtifactSources.value.filter(source => source.type === form.type).length > 1
+));
+
+const resourceSourceNotice = computed(() => {
+  if (legacySourceAmbiguous.value) {
+    return {
+      status: "incompatible",
+      message: t("syncPage.addArtForm.sourceStatus.ambiguous"),
+    };
+  }
+  if (!isResourceRefV1(form.sourceRef)) return null;
+  if (resourceSourceStatus.value) {
+    return {
+      status: resourceSourceStatus.value,
+      message: t("syncPage.addArtForm.sourceStatus.notice", {
+        status: providerStatusLabel(resourceSourceStatus.value),
+      }),
+    };
+  }
+  if (selectedRepresentationUnsupported.value) {
+    return {
+      status: "incompatible",
+      message: t("syncPage.addArtForm.representation.unsupported", {
+        representation: form.representation,
+      }),
+    };
+  }
+  if (!form.representation) {
+    return {
+      status: "incompatible",
+      message: t("syncPage.addArtForm.representation.isRequired"),
+    };
+  }
+  return null;
+});
+
 const displayType = computed(() => {
   return (
-    sourceOptions.value.find(item => item.value === form.type)?.text ??
+    sourceOptions.value.find(item => item.value === sourceModel.value[0])?.text ??
+    (isResourceRefV1(form.sourceRef)
+      ? extensionsStore.manifest(form.sourceRef.providerId)?.name
+      : undefined) ??
     t("specificWord.unknown")
   );
 });
 
 const displaySourceName = computed(() => {
-  const typeObj = sourceOptions.value.find(item => item.value === form.type);
+  const typeObj = sourceOptions.value.find(item => item.value === sourceModel.value[0]);
   return (
-    typeObj?.children?.find(item => item.value === form.source)?.text ??
+    typeObj?.children?.find(item => (
+      item.value === (isResourceRefV1(form.sourceRef) ? form.sourceRef.id : form.source)
+    ))?.text ??
+    currentExtensionArtifactSourceItem.value?.displayName ??
+    currentExtensionArtifactSourceItem.value?.name ??
     (form.source
       ? `${form.source}(🚫)`
       : t("specificWord.unknownSource"))
@@ -654,10 +855,46 @@ const updateSourceInput = () => {
 };
 
 const sourceChange = (value: string[]) => {
-  form.type = value[0];
-  form.source = value[1];
+  const source = findArtifactSourceDescriptor(
+    extensionArtifactSources.value,
+    value[0],
+  );
+  const item = findArtifactSourceItem(source, value[1]);
+  const selection = source && item ? artifactSourceSelection(source, item) : null;
+  const sourceRef = source && item
+    ? resourceRefFromArtifactSource(source, item)
+    : undefined;
+
+  form.type = source?.type || value[0];
+  form.source = sourceRef
+    ? item?.displayName || item?.name || value[1]
+    : item?.name || value[1];
+  if (sourceRef && selection) {
+    form.sourceRef = sourceRef;
+    form.representation = "";
+    sourceModel.value = [selection.contributionId, selection.itemId];
+  } else {
+    delete form.sourceRef;
+    delete form.representation;
+    sourceModel.value = [form.type, form.source];
+  }
   normalizeSelectedArtifactPlatform();
+  normalizeSelectedArtifactRepresentation();
   updateSourceInput();
+};
+
+const representationChange = () => {
+  normalizeSelectedArtifactPlatform();
+};
+
+const platformChange = () => {
+  if (!currentExtensionArtifactSource.value) return;
+  const mapped = resolveArtifactSourceRepresentation({
+    source: currentExtensionArtifactSource.value,
+    item: currentExtensionArtifactSourceItem.value,
+    platform: form.platform,
+  });
+  form.representation = mapped;
 };
 
 const currentTag = computed(() => form.tag || "");
@@ -693,6 +930,12 @@ watchEffect(() => {
   form.iconFit = normalizeOptionalImageFit(sourceData.iconFit);
   form.source = sourceData.source;
   form.type = sourceData.type;
+  form.sourceRef = isResourceRefV1(sourceData.sourceRef)
+    ? { ...sourceData.sourceRef }
+    : undefined;
+  form.representation = typeof sourceData.representation === "string"
+    ? sourceData.representation
+    : "";
   form["age-public-key"] = sourceData["age-public-key"] || "";
   form.platform = sourceData.platform || "Stash";
   form.sync = sourceData.sync ?? false;
@@ -702,14 +945,24 @@ watchEffect(() => {
   form.prettyYaml = sourceData.prettyYaml ?? false;
   form.updated = sourceData.updated;
   form.url = sourceData.url;
-  sourceModel.value = [form.type, form.source];
+  sourceModel.value = isResourceRefV1(form.sourceRef)
+    ? [form.sourceRef.providerContributionId, form.sourceRef.id]
+    : [form.type, form.source];
   updateSourceInput();
   isInit.value = true;
 });
 
 watch(
-  [sourceOptions, () => form.type, () => form.source, extensionArtifactSources],
+  [
+    sourceOptions,
+    () => form.type,
+    () => form.source,
+    () => form.sourceRef,
+    () => form.representation,
+    extensionArtifactSources,
+  ],
   () => {
+    normalizeSelectedArtifactRepresentation();
     normalizeSelectedArtifactPlatform();
     updateSourceInput();
   },
@@ -842,6 +1095,30 @@ const submit = () => {
     }
 
     const data: any = JSON.parse(JSON.stringify(toRaw(form)));
+    if (isResourceRefV1(form.sourceRef)) {
+      data.sourceRef = { ...form.sourceRef };
+      data.representation = `${form.representation || ""}`.trim();
+      if (!data.representation || selectedRepresentationUnsupported.value) {
+        isSubmitting.value = false;
+        focusValidationErrorTab({ representation: true });
+        Dialog({
+          title: t(`syncPage.addArtForm.pop.errorTitle`),
+          content: selectedRepresentationUnsupported.value
+            ? t("syncPage.addArtForm.representation.unsupported", {
+                representation: data.representation,
+              })
+            : t("syncPage.addArtForm.representation.isRequired"),
+          popClass: "auto-dialog",
+          noCancelBtn: true,
+          okText: t(`syncPage.addArtForm.pop.errorBtn`),
+          closeOnClickOverlay: true,
+        });
+        return;
+      }
+    } else {
+      delete data.sourceRef;
+      delete data.representation;
+    }
     const iconFit = normalizeOptionalImageFit(form.iconFit);
     if (iconFit) {
       data.iconFit = iconFit;
@@ -1025,6 +1302,33 @@ const submit = () => {
 
     .nut-radio {
       margin: 20px 0 0 0;
+    }
+  }
+
+  .resource-source-notice {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin: 10px 14px 0;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--comment-text-color) 10%, transparent);
+    color: var(--comment-text-color);
+    font-size: 13px;
+    line-height: 1.45;
+
+    :deep(.nut-icon) {
+      flex: 0 0 auto;
+      margin-top: 1px;
+    }
+
+    &.status-disabled,
+    &.status-missing,
+    &.status-incompatible,
+    &.status-updating,
+    &.status-unavailable {
+      background: color-mix(in srgb, var(--warning-color, #d88900) 10%, transparent);
+      color: var(--warning-color, #d88900);
     }
   }
 }

@@ -1117,6 +1117,20 @@ export default {
         isRequired: "Source is required",
         placeholder: "Please select a source",
       },
+      representation: {
+        label: "Output Format",
+        isRequired: "Select a concrete output format supported by this source",
+        unsupported: "This source no longer supports the saved output format {representation}. Select a different source or format.",
+      },
+      sourceStatus: {
+        notice: "This source is {status}. Its reference is preserved, but generation will not fall back to another plugin of the same type.",
+        ambiguous: "Multiple plugins provide this legacy source type, so its original provider cannot be selected safely. Choose a source with an explicit plugin identity.",
+        disabled: "disabled",
+        missing: "not installed",
+        incompatible: "incompatible",
+        updating: "updating",
+        unavailable: "temporarily unavailable",
+      },
       upload: {
         label: "Upload Artifact",
         tips: {

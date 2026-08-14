@@ -4,6 +4,7 @@ import {
   faAnglesRight,
   faAngleRight,
   faArrowRotateRight,
+  faArrowRotateLeft,
   faArrowsRotate,
   faArrowUpRightFromSquare,
   faArrowLeft,
@@ -70,6 +71,12 @@ import {
   faTriangleExclamation,
   faUser,
   faChevronRight,
+  faChevronDown,
+  faChevronUp,
+  faFileArrowUp,
+  faFilter,
+  faFilterCircleXmark,
+  faSliders,
 } from '@fortawesome/free-solid-svg-icons';
 
 library.add(faFileImport);
@@ -105,6 +112,7 @@ library.add(faGear);
 library.add(faFileLines);
 library.add(faDesktop);
 library.add(faArrowRotateRight);
+library.add(faArrowRotateLeft);
 library.add(faArrowsRotate);
 library.add(faArrowLeft);
 library.add(faAnglesRight);
@@ -141,3 +149,9 @@ library.add(faBoxArchive);
 library.add(faShare);
 library.add(faMagnifyingGlass);
 library.add(faTriangleExclamation);
+library.add(faChevronDown);
+library.add(faChevronUp);
+library.add(faFileArrowUp);
+library.add(faFilter);
+library.add(faFilterCircleXmark);
+library.add(faSliders);

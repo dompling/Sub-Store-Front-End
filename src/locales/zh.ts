@@ -1077,6 +1077,20 @@ export default {
         isRequired: '来源不能为空',
         placeholder: '请选择来源',
       },
+      representation: {
+        label: '输出格式',
+        isRequired: '请选择此来源支持的具体输出格式',
+        unsupported: '来源不再支持已保存的输出格式 {representation}。请重新选择来源或格式。',
+      },
+      sourceStatus: {
+        notice: '当前来源{status}。引用会保留，但生成时不会回退到同类型的其他插件。',
+        ambiguous: '有多个插件提供此旧来源类型，无法安全判断原提供者。请重新选择一个带有明确插件身份的来源。',
+        disabled: '已停用',
+        missing: '未安装',
+        incompatible: '不兼容',
+        updating: '正在更新',
+        unavailable: '暂不可用',
+      },
       platform: {
         label: '目标平台',
         isRequired: '目标平台不能为空',

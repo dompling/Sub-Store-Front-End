@@ -20,7 +20,8 @@ type ArtifactsPlatform =
   | 'URI'
   | 'JSON';
 
-type ArtifactType = 'collection' | 'subscription' | 'file' | 'config-project';
+type KnownArtifactType = 'collection' | 'subscription' | 'file' | 'config-project';
+type ArtifactType = KnownArtifactType | (string & {});
 
 interface Artifact {
   name: string;
@@ -31,6 +32,8 @@ interface Artifact {
   iconFit?: ImageFit | null;
   type: ArtifactType;
   source: string;
+  sourceRef?: import('@/extensions/contracts').ResourceRefV1;
+  representation?: string;
   platform: ArtifactsPlatform;
   tag?: string[];
   sync?: boolean;
@@ -51,6 +54,8 @@ interface ArtifactForm {
   iconFit?: ImageFit | null;
   type: ArtifactType;
   source: [string, string];
+  sourceRef?: import('@/extensions/contracts').ResourceRefV1;
+  representation?: string;
   platform: ArtifactsPlatform;
   tag?: string[];
   sync?: boolean;

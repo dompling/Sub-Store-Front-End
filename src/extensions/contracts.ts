@@ -193,17 +193,60 @@ export interface ExtensionSource {
   [key: string]: unknown;
 }
 
+export interface ResourceRefV1 {
+  schema: 'substore.resource-ref@1';
+  providerId: string;
+  providerContributionId: string;
+  type: string;
+  id: string;
+  contract: string;
+}
+
+export type ResourceAvailabilityStatus =
+  | 'available'
+  | 'disabled'
+  | 'missing'
+  | 'incompatible'
+  | 'updating';
+
+export interface ResourceAvailabilityV1 {
+  status: ResourceAvailabilityStatus;
+  reasonCode?: string;
+  [key: string]: unknown;
+}
+
+export interface ResourceLifecycleV1 {
+  state: 'active' | 'archived';
+  archivedAt?: number;
+}
+
 export interface ExtensionArtifactSourceItem {
+  schema?: 'substore.resource-descriptor@1';
+  ref?: ResourceRefV1;
+  /** Legacy artifact sources use `name` as their provider-defined item id. */
   name: string;
   displayName?: string;
+  description?: string;
+  revision?: string | number;
+  updatedAt?: number;
+  contracts?: string[];
+  representations?: string[];
+  lifecycle?: ResourceLifecycleV1;
+  availability?: ResourceAvailabilityV1;
   [key: string]: unknown;
 }
 
 /** A source picker contribution exposed by an enabled backend extension. */
 export interface ExtensionArtifactSourceDescriptor {
+  /** Namespaced manifest contribution identity used by precise ResourceRef records. */
+  id?: string | null;
+  /** Backward-compatible alias returned by newer Hosts. */
+  sourceId?: string | null;
   type: string;
+  contract?: string | null;
   labelKey?: string;
   platforms?: string[];
+  representations?: string[];
   items: ExtensionArtifactSourceItem[];
   ownerExtensionId?: string;
   status: ExtensionStatus;
