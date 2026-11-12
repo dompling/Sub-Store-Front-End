@@ -33,6 +33,7 @@ export default {
     },
   },
   globalNotify: {
+    copyFailed: '复制失败\n{e}',
     refresh: {
       succeed: '数据刷新完成',
       flowFailed: '刷新 {name} 失败！',
@@ -143,7 +144,7 @@ export default {
         sync: {
           title: '什么是同步？',
           content:
-            '将订阅/文件上传到私有 Gist，在无法运行 Sub Store 的设备（例如路由器等）上也可以随时访问。',
+            '将订阅/文件上传到私有 Gist，在无法运行 Sub-Store 的设备（例如路由器等）上也可以随时访问。',
         },
         subEditor: {
           title: '下载不了订阅？',
@@ -492,6 +493,9 @@ export default {
         noFlow: {
           label: '不查询订阅流量信息',
         },
+        noCache: {
+          label: '禁用远程缓存',
+        },
         subUserinfo: {
           label: '订阅流量信息',
           placeholder: '值/链接(链接支持 headers/noCache/headersCacheTtl 等参数)',
@@ -680,8 +684,8 @@ export default {
           types: ['IPv4', 'IPv6'],
           filters: ['不过滤', '移除失败', '只保留 IP', '只保留 IPv4', '只保留 IPv6'],
           cache: ['启用', '禁用'],
-          customDns: '自定义 DNS(全平台支持 DoH, Node.js 额外支持 DoT 和 TCP/UDP DNS)',
-          customDnsPlaceholder: '每行一个 DNS: DoH 或 [udp://]1.1.1.1[:53] 或 tcp://1.1.1.1[:53] 或 tls://223.5.5.5[:853] (括号内可省略)',
+          customDns: '自定义 DNS:\n全平台支持 DoH\nNode.js 支持 DoH, DoT 和 TCP/UDP DNS\nLoon(Build ≥ 988) 支持 DoH/DoH3/DoQ 和 UDP DNS, 支持 auto(当前 DNS), system(系统 DNS). 除 DoH 外, 不支持 EDNS 和自定义证书校验',
+          customDnsPlaceholder: '每行一个 DNS: DoH 或 [udp://]1.1.1.1[:53] 或 tcp://1.1.1.1[:53] 或 tls://223.5.5.5[:853] 或 h3://dns.example[:443]/dns-query 或 quic://dns.adguard-dns.com[:853] 或 auto 或 system (括号内可省略, 具体支持哪些请查看上面不同运行环境说明)',
           tlsSkipCertVerify: 'DoH/DoT 服务器证书',
           tlsSkipCertVerifyOptions: ['验证', '不验证'],
           dnsConcurrency: '多 DNS 并发数',
@@ -724,6 +728,7 @@ export default {
             'mieru',
             'sudoku',
             'MASQUE',
+            'MASQUE(Surge)',
             'Shadow QUIC',
             'NaïveProxy',
             'AnyTLS',
@@ -732,6 +737,7 @@ export default {
             'GOST Relay',
             'ZeroTier',
             'Tailscale',
+            'EasyTier',
             'WireGuard',
             'SSH',
             'External Proxy Program',
@@ -1216,6 +1222,7 @@ export default {
         month: "月",
         season: "季",
         year: "年",
+        lifetime: "长期有效",
       },
       copyBtn: "复制链接",
     },
@@ -1243,6 +1250,14 @@ export default {
       datetimeBackendCheckFailed: {
         title: "暂时无法验证后端版本",
         desc: "请检查当前后端连接是否正常，然后重试保存指定到期日期时间。",
+      },
+      lifetimeBackendRequired: {
+        title: "当前后端暂不支持长期有效",
+        desc: "检测到后端版本为 {currentVersion}，需要升级到 {minVersion} 或更高版本后，才能保存长期有效的分享。",
+      },
+      lifetimeBackendCheckFailed: {
+        title: "暂时无法验证后端版本",
+        desc: "请检查当前后端连接是否正常，然后重试保存长期有效的分享。",
       },
       failNotify: "更新分享失败",
     },
@@ -1516,7 +1531,7 @@ export default {
     currentHostApi: '当前后端 API',
     yhostapi: '默认:https://sub.store ',
     serverDesc: `配置后端服务器地址，例如 VPS 或 Render 上搭建的后端服务。
-                配置后需要重启 Sub Store 以生效。如需删除 api，
+                配置后需要重启 Sub-Store 以生效。如需删除 api，
                 使用原本的’默认后端‘需要手动删除地址后点击保存。可以跳转链接 查看 小一佬的后端搭建教程：`,
     InputHostApi: {
       title: '链接验证失败 或无效链接',

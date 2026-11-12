@@ -41,22 +41,22 @@ export const useSystemStore = defineStore('systemStore', {
   },
   getters: {
     navBarHeight: (state) => {
-      return shouldUsePwaTopInset(state) ? (state.isSmall ? "78px" : "95px") : "56px";
+      return shouldUsePwaTopInset(state) ? (state.isSmall ? "78px" : "125px") : "56px";
     },
     navBartop: (state) => {
-      return shouldUsePwaTopInset(state) ? (state.isSmall ? "38px" : "55px") : "0px";
+      return shouldUsePwaTopInset(state) ? (state.isSmall ? "38px" : "85px") : "0px";
     },
     navActionOffset: (state) => {
-      const navBarHeightNum = shouldUsePwaTopInset(state) ? (state.isSmall ? 78 : 95) : 56;
-      const navBarTopNum = shouldUsePwaTopInset(state) ? (state.isSmall ? 38 : 55) : 0;
+      const navBarHeightNum = shouldUsePwaTopInset(state) ? (state.isSmall ? 78 : 125) : 56;
+      const navBarTopNum = shouldUsePwaTopInset(state) ? (state.isSmall ? 38 : 85) : 0;
 
       return `${(navBarHeightNum + navBarTopNum) / 2}px`;
     },
     navBartopRight: (state) => {
-      return shouldUsePwaTopInset(state) ? (state.isSmall ? "52px" : "65px") : "15px";
+      return shouldUsePwaTopInset(state) ? (state.isSmall ? "52px" : "95px") : "15px";
     },
     pwaTopPadding: (state) => {
-      return shouldUsePwaTopInset(state) ? (state.isSmall ? "20px" : "45px") : "0px";
+      return shouldUsePwaTopInset(state) ? (state.isSmall ? "20px" : "75px") : "0px";
     }
   },
   actions: {

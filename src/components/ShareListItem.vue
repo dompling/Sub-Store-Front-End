@@ -112,13 +112,12 @@
 </template>
 
 <script lang="ts" setup>
-import { useClipboard } from "@vueuse/core";
 import { Dialog, Toast } from "@nutui/nutui";
 import dayjs from "dayjs";
 import { storeToRefs } from "pinia";
 import { computed, createVNode } from "vue";
 import { useI18n } from "vue-i18n";
-import useV3Clipboard from "vue-clipboard3";
+import { copyText } from "@/utils/clipboard";
 import { useRouter } from "vue-router";
 import logoIcon from "@/assets/icons/logo.png";
 import logoRedIcon from "@/assets/icons/logo-red.png";
@@ -135,6 +134,7 @@ import {
   formatShareTimestamp,
   getShareEditPath,
   getSharePublicUrl,
+  isShareLifetimeExpiration,
   resolveShareDisplayIconState,
 } from "@/utils/share";
 import { normalizeTagArray } from "@/utils/shareTags";
@@ -146,8 +146,6 @@ const props = defineProps<{
   disabled?: boolean;
   isDualColumn?: boolean;
 }>();
-const { copy, isSupported } = useClipboard();
-const { toClipboard: copyFallback } = useV3Clipboard();
 const { t } = useI18n();
 const { env } = useBackend();
 const isArchiveEnabled = computed(() => {
@@ -219,6 +217,10 @@ const leftTime = computed(() => {
       && usedCount >= 0
       ? `${t("sharePage.countUsage")} ${Math.min(usedCount, count)}/${count}`
       : t("sharePage.expired");
+  }
+
+  if (isShareLifetimeExpiration(props?.data)) {
+    return t("sharePage.createShare.unit.lifetime");
   }
 
   return props?.data?.exp
@@ -310,12 +312,12 @@ const onClickCopyLink = async () => {
     return;
   }
   const url = getShareUrl();
-  if (isSupported) {
-    await copy(url);
-  } else {
-    await copyFallback(url);
+  try {
+    await copyText(url);
+    showNotify({ title: t("sharePage.copyShare.succeedNotify") });
+  } catch (error) {
+    Toast.fail(t("globalNotify.copyFailed", { e: error?.message ?? String(error) }));
   }
-  showNotify({ title: t("sharePage.copyShare.succeedNotify") });
 };
 
 const onClickShareLink = async () => {
@@ -521,7 +523,8 @@ const onClickPreviews = () => {
         .refresh-sub-flow {
         background-color: transparent;
         border: none;
-        padding: 0 6px;
+        padding: 11px 6px;
+        margin: -11px 0;
         cursor: pointer;
         display: inline-flex;
         justify-content: center;

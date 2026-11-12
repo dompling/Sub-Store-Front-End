@@ -94,8 +94,8 @@
   import singbox from '@/assets/icons/sing-box.png';
   import clashmeta from '@/assets/icons/clashmeta.png';
   import logoIcon from '@/assets/icons/logo.png';
-  import { useClipboard } from '@vueuse/core';
-  import useV3Clipboard from 'vue-clipboard3';
+  import { copyText } from '@/utils/clipboard';
+  import i18n from '@/locales';
   import { useAppNotifyStore } from '@/store/appNotify';
   import SvgIcon from '@/components/SvgIcon.vue';
   import { useHostAPI } from '@/hooks/useHostAPI';
@@ -109,9 +109,8 @@
   const includeUnsupportedProxy = ref(false);
   const prettyYaml = ref(false);
   const noFlow = ref(false);
-  const { copy, isSupported } = useClipboard();
-  const { toClipboard: copyFallback } = useV3Clipboard();
   const { showNotify } = useAppNotifyStore();
+  const { t } = i18n.global;
   type PreviewPlatform = {
     name: string;
     path: string | null;
@@ -257,12 +256,12 @@
   }
   const targetCopy = async (path: string | null) => {
     const url = getUrl(path);
-    if (isSupported) {
-      await copy(url);
-    } else {
-      await copyFallback(url);
+    try {
+      await copyText(url);
+      showNotify({ title: props.notify });
+    } catch (error) {
+      Toast.fail(t("globalNotify.copyFailed", { e: error?.message ?? String(error) }));
     }
-    showNotify({ title: props.notify });
   };
   const defaultPlatformList: PreviewPlatform[] = [
     {

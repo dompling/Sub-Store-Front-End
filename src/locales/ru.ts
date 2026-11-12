@@ -32,6 +32,7 @@ export default {
     }
   },
   "globalNotify": {
+    "copyFailed": "Не удалось скопировать\n{e}",
     "refresh": {
       "succeed": "Обновление завершено",
       "flowFailed": "Ошибка обновления {name}!",
@@ -482,6 +483,9 @@ export default {
         "noFlow": {
           "label": "Не запрашивать информацию о трафике"
         },
+        "noCache": {
+          "label": "Отключить удалённый кэш"
+        },
         "subUserinfo": {
           "label": "Данные подписки в заголовке",
           "placeholder": "Значение/URL (URL поддерживает заголовки, noCache, headersCacheTtl и др.)"
@@ -633,8 +637,8 @@ export default {
             "Включено",
             "Отключено"
           ],
-          "customDns": "Custom DNS (DoH на всех платформах; DoT и TCP/UDP DNS дополнительно в Node.js)",
-          "customDnsPlaceholder": "По одному DNS в строке: DoH, [udp://]1.1.1.1[:53], tcp://1.1.1.1[:53] или tls://223.5.5.5[:853] (скобки необязательны)",
+          "customDns": "Custom DNS:\nВсе платформы поддерживают DoH\nNode.js поддерживает DoH, DoT и TCP/UDP DNS\nLoon (Build ≥ 988) поддерживает DoH/DoH3/DoQ и UDP DNS, auto (текущий DNS), system (системный DNS). Кроме DoH, EDNS и настройка проверки сертификата не поддерживаются",
+          "customDnsPlaceholder": "По одному DNS в строке: DoH, [udp://]1.1.1.1[:53], tcp://1.1.1.1[:53], tls://223.5.5.5[:853], h3://dns.example[:443]/dns-query, quic://dns.adguard-dns.com[:853], auto или system (части в скобках необязательны; поддерживаемые форматы для каждой среды указаны выше)",
           "tlsSkipCertVerify": "Сертификат сервера DoH/DoT",
           "tlsSkipCertVerifyOptions": ["Проверять", "Не проверять"],
           "dnsConcurrency": "Параллельность нескольких DNS",
@@ -698,6 +702,7 @@ export default {
             "mieru",
             "sudoku",
             "MASQUE",
+            'MASQUE(Surge)',
             "Shadow QUIC",
             "NaïveProxy",
             "AnyTLS",
@@ -706,6 +711,7 @@ export default {
             "GOST Relay",
             'ZeroTier',
             "Tailscale",
+            "EasyTier",
             "WireGuard",
             "SSH",
             "Внешний прокси-клиент",
@@ -1307,7 +1313,8 @@ export default {
         "day": "Дн.",
         "month": "Мес.",
         "season": "Квартал",
-        "year": "Год"
+        "year": "Год",
+        "lifetime": "Бессрочно"
       },
       "copyBtn": "Копировать ссылку"
     },
@@ -1335,6 +1342,14 @@ export default {
       "datetimeBackendCheckFailed": {
         "title": "В данный момент невозможно проверить версию бэкенда",
         "desc": "Проверьте текущее подключение к бэкенду и попробуйте сохранить точную дату и время истечения снова."
+      },
+      "lifetimeBackendRequired": {
+        "title": "Этот бэкенд еще не поддерживает бессрочные ссылки",
+        "desc": "Текущая версия бэкенда: {currentVersion}. Обновитесь до версии {minVersion} или выше, чтобы сохранять бессрочные ссылки."
+      },
+      "lifetimeBackendCheckFailed": {
+        "title": "В данный момент невозможно проверить версию бэкенда",
+        "desc": "Проверьте текущее подключение к бэкенду и попробуйте сохранить бессрочную ссылку снова."
       },
       "failNotify": "Не удалось обновить ссылку для шеринга"
     },

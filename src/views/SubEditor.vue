@@ -228,6 +228,20 @@
               />
             </div>
           </nut-form-item>
+
+          <nut-form-item
+            v-if="
+              form.source === 'remote' ||
+              ['localFirst', 'remoteFirst'].includes(form.mergeSources)
+            "
+            :label="$t(`editorPage.subConfig.basic.noCache.label`)"
+            prop="noCache"
+            class="ignore-failed-wrapper"
+          >
+            <div class="switch-wrapper">
+              <nut-switch v-model="form.noCache" />
+            </div>
+          </nut-form-item>
           <!-- ua -->
           <nut-form-item
             :label="$t(`editorPage.subConfig.basic.passThroughUA.label`)"
@@ -714,6 +728,7 @@ const SUB_EDITOR_PROP_TO_TAB: Partial<Record<string, SubEditorTab>> = {
   content: "content",
   passThroughUA: "content",
   ua: "content",
+  noCache: "content",
   noFlow: "content",
   subUserinfo: "content",
   proxy: "content",
@@ -999,6 +1014,7 @@ watchEffect(() => {
         form.url = "";
         form.content = "";
         form.ua = "";
+        form.noCache = false;
         cmStore.setEditCode('SubEditer', "");
         break;
     }
@@ -1057,6 +1073,7 @@ watchEffect(() => {
       form.content = sourceData.content;
       cmStore.setEditCode('SubEditer', sourceData.content);
       form.ua = sourceData.ua;
+      form.noCache = sourceData.noCache === true;
       form._savedUA = sourceData._savedUA;
       if(form.passThroughUA && form.ua){
         showNotify({

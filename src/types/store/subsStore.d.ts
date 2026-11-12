@@ -42,6 +42,7 @@ interface Sub {
   iconFit?: ImageFit | null;
   ua?: string;
   mergeSources?: string;
+  noCache?: boolean;
   noFlow?: boolean;
   subUserinfo?: string;
   tag?: string[];
@@ -111,7 +112,7 @@ interface Share {
   mode?: 'duration' | 'datetime' | 'count' | null;
   expiresIn?: string | null;
   expiresValue?: string | null;
-  expiresUnit?: 'day' | 'month' | 'season' | 'year' | null;
+  expiresUnit?: 'day' | 'month' | 'season' | 'year' | 'lifetime' | null;
   expiresAt?: number | null;
   exp?: number | null;
   count?: number | null;
@@ -137,7 +138,7 @@ interface ShareToken {
   options?: {
     expiresIn?: number | string | undefined;
     expiresValue?: number | string | undefined;
-    expiresUnit?: 'day' | 'month' | 'season' | 'year' | undefined;
+    expiresUnit?: 'day' | 'month' | 'season' | 'year' | 'lifetime' | undefined;
     exp?: number | string | null | undefined;
     count?: number | string | undefined;
     usedCount?: number | string | undefined;

@@ -313,6 +313,10 @@ textarea::-webkit-input-placeholder {
   --toastify-toast-min-height: 48px;
 }
 
+.Toastify__toast-body {
+  overflow-wrap: anywhere;
+}
+
 .nut-radio, .nut-radio--round, .nut-checkbox, .nut-checkbox--round  {
   cursor: pointer;
 }

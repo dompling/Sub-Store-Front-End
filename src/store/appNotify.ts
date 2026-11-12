@@ -34,7 +34,7 @@ const isPWA = () => {
     window.matchMedia("(display-mode: standalone)").matches &&
     !/Android/.test(navigator.userAgent)
   ) {
-    h = 60;
+    h = 96;
     if (window.innerHeight < 750 || /iPad/.test(navigator.userAgent)) {
       h = 18;
     }

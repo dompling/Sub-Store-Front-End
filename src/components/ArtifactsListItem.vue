@@ -23,8 +23,8 @@
       </div>
       <div class="sub-item-content">
         <div class="sub-item-title-wrapper">
-          <h3 class="sub-item-title">
-            {{ displayName }}
+          <h3 class="sub-item-title" :title="displayName">
+            <span class="sub-item-name">{{ displayName }}</span>
             <span v-for="item in tag" :key="item" class="tag">
               <nut-tag>{{ item }}</nut-tag>
             </span>
@@ -215,18 +215,15 @@ import { createGithubProxyUrlRewriter } from "@/utils/githubProxy";
 import { resolveImageFit } from "@/utils/iconFit";
 import { isMobile } from "@/utils/isMobile";
 import { Dialog, Toast } from "@nutui/nutui";
-import { useClipboard } from "@vueuse/core";
 import { storeToRefs } from "pinia";
 import { computed, ref, toRaw, watch, watchEffect } from "vue";
-import useV3Clipboard from "vue-clipboard3";
+import { copyText } from "@/utils/clipboard";
 import { useI18n } from "vue-i18n";
 import { useGlobalStore } from "@/store/global";
 import { useHostAPI } from "@/hooks/useHostAPI";
 import { useBackend } from "@/hooks/useBackend";
 import { openManagedDeleteDialog } from "@/utils/archive";
 const globalStore = useGlobalStore();
-const { copy, isSupported } = useClipboard();
-const { toClipboard: copyFallback } = useV3Clipboard();
 
 const { t } = useI18n();
 const { currentUrl: host } = useHostAPI();
@@ -546,12 +543,12 @@ const swipeController = () => {
 };
 
 const onClickCopyLink = async () => {
-  if (isSupported) {
-    await copy(encodeURI(artifactUrl.value));
-  } else {
-    await copyFallback(encodeURI(artifactUrl.value));
+  try {
+    await copyText(encodeURI(artifactUrl.value));
+    showNotify({ title: t("syncPage.copyNotify.succeed"), type: "success" });
+  } catch (error) {
+    Toast.fail(t("syncPage.copyNotify.failed", { e: error?.message ?? String(error) }));
   }
-  showNotify({ title: t("syncPage.copyNotify.succeed"), type: "success" });
 };
 
 const onDeleteConfirm = async (mode: DeleteMode = "permanent") => {
@@ -674,19 +671,27 @@ watch(isSyncOpen, async () => {
       gap: 2px;
 
       .sub-item-title {
-        display: -webkit-box;
-        -webkit-box-orient: vertical;
-        -webkit-line-clamp: 1;
-        word-wrap: break-word;
-        word-break: break-all;
+        flex: 1 1 auto;
+        min-width: 0;
+        display: flex;
+        align-items: center;
+        gap: 3px;
+        white-space: nowrap;
         overflow: hidden;
         font-size: 16px;
         color: var(--primary-text-color);
 
+        .sub-item-name {
+          min-width: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
         .tag {
           display: inline-flex;
+          flex: 0 0 auto;
           margin: 0 1px;
-          vertical-align: middle;
 
           :deep(.nut-tag) {
             padding: 2px 3px;
@@ -853,7 +858,8 @@ watch(isSyncOpen, async () => {
 .copy-sub-link {
   background-color: transparent;
   border: none;
-  padding: 0 8px;
+  padding: 11px 6px;
+  margin: -11px 0;
   cursor: pointer;
   display: inline-flex;
   justify-content: center;

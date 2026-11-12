@@ -33,6 +33,7 @@ export default {
     },
   },
   globalNotify: {
+    copyFailed: "Copy failed\n{e}",
     refresh: {
       succeed: "Refresh Completed",
       flowFailed: "Refresh of {name} failed!",
@@ -143,7 +144,7 @@ export default {
         sync: {
           title: "What is Sync?",
           content:
-            "Upload your subscriptions/files to a private Gist, which can be accessed at any time on devices that do not run the Sub Store (e.g. routers, etc.).",
+            "Upload your subscriptions/files to a private Gist, which can be accessed at any time on devices that do not run the Sub-Store (e.g. routers, etc.).",
         },
         subEditor: {
           title: "Download no subscription?",
@@ -504,6 +505,9 @@ export default {
         noFlow: {
           label: "Do not query subscription traffic info",
         },
+        noCache: {
+          label: "Disable Remote Cache",
+        },
         subUserinfo: {
           label: "Subscription-Userinfo",
           placeholder: "Value/URL(URL supports headers/noCache/headersCacheTtl etc.)",
@@ -648,8 +652,8 @@ export default {
             "IPv6 Only",
           ],
           cache: ["Enabled", "Disabled"],
-          customDns: "Custom DNS (DoH on all platforms; DoT and TCP/UDP DNS additionally in Node.js)",
-          customDnsPlaceholder: "One DNS per line: DoH, [udp://]1.1.1.1[:53], tcp://1.1.1.1[:53], or tls://223.5.5.5[:853] (brackets are optional)",
+          customDns: "Custom DNS:\nAll platforms support DoH\nNode.js supports DoH, DoT and TCP/UDP DNS\nLoon (Build ≥ 988) supports DoH/DoH3/DoQ and UDP DNS, auto (current DNS), and system (system DNS). Except for DoH, EDNS and custom certificate verification are not supported",
+          customDnsPlaceholder: "One DNS per line: DoH, [udp://]1.1.1.1[:53], tcp://1.1.1.1[:53], tls://223.5.5.5[:853], h3://dns.example[:443]/dns-query, quic://dns.adguard-dns.com[:853], auto, or system (parts in brackets are optional; see the runtime descriptions above for supported formats)",
           tlsSkipCertVerify: "DoH/DoT Server Certificate",
           tlsSkipCertVerifyOptions: ["Verify", "Do Not Verify"],
           dnsConcurrency: "Multi-DNS Concurrency",
@@ -701,6 +705,7 @@ export default {
             "mieru",
             "sudoku",
             "MASQUE",
+            'MASQUE(Surge)',
             "Shadow QUIC",
             "NaïveProxy",
             "AnyTLS",
@@ -709,6 +714,7 @@ export default {
             'GOST Relay',
             'ZeroTier',
             'Tailscale',
+            'EasyTier',
             "WireGuard",
             "SSH",
             "External Proxy Program",
@@ -1262,6 +1268,7 @@ export default {
         month: "Month",
         season: "Season",
         year: "Year",
+        lifetime: "Lifetime",
       },
       copyBtn: "Copy Link",
     },
@@ -1289,6 +1296,14 @@ export default {
       datetimeBackendCheckFailed: {
         title: "Unable to verify backend version right now",
         desc: "Check the current backend connection and try saving the exact expiration date and time again.",
+      },
+      lifetimeBackendRequired: {
+        title: "This backend does not support lifetime shares yet",
+        desc: "The current backend version is {currentVersion}. Upgrade to {minVersion} or later before saving a lifetime share.",
+      },
+      lifetimeBackendCheckFailed: {
+        title: "Unable to verify backend version right now",
+        desc: "Check the current backend connection and try saving the lifetime share again.",
       },
       failNotify: "Update share failed",
     },
@@ -1563,7 +1578,7 @@ export default {
     currentHostApi: "Current Backend API",
     yhostapi: "Default:https://sub.store ",
     serverDesc:
-      "Configure the back-end server address, such as the back-end service set up on VPS or Render. After the configuration, restart the Sub Store to take effect. To delete the api, use the original default backend to manually delete the address and click Save",
+      "Configure the back-end server address, such as the back-end service set up on VPS or Render. After the configuration, restart the Sub-Store to take effect. To delete the api, use the original default backend to manually delete the address and click Save",
     InputHostApi: {
       title: "Link validation failed invalid link",
       content:
